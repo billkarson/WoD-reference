@@ -239,7 +239,7 @@
 
   #searchInput {
     width: 100%;
-    padding: 12px 14px 12px 40px;
+    padding: 12px 36px 12px 40px;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 6px;
@@ -250,6 +250,23 @@
     transition: border-color 0.2s;
     -webkit-appearance: none;
   }
+
+  #clearSearch {
+    position: absolute; right: 10px; top: 50%;
+    transform: translateY(-50%);
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    padding: 4px 6px;
+    border-radius: 4px;
+    display: none;
+    -webkit-appearance: none;
+  }
+  #clearSearch:hover { color: var(--text-bright); }
+  #clearSearch.visible { display: block; }
 
   #searchInput:focus { border-color: var(--gold-dim); }
   #searchInput::placeholder { color: var(--text-dim); }
@@ -679,6 +696,7 @@ function renderSearchBar() {
       <input id="searchInput" type="search" inputmode="search" autocomplete="off" autocorrect="off"
         placeholder="${placeholder}"
         value="${escH(state.search)}" oninput="onSearch(this.value)">
+      <button id="clearSearch" class="${state.search ? 'visible' : ''}" onclick="clearSearch()" aria-label="Clear search">✕</button>
     </div>
     ${filterHtml}`;
 }
@@ -877,9 +895,22 @@ function goAll() {
   renderResults();
 }
 
+function clearSearch() {
+  state.search = '';
+  const inp = document.getElementById('searchInput');
+  if (inp) { inp.value = ''; inp.focus(); }
+  const btn = document.getElementById('clearSearch');
+  if (btn) btn.classList.remove('visible');
+  buildSidebar();
+  renderResults();
+}
+
 let searchTimeout;
 function onSearch(val) {
   state.search = val;
+  // Show/hide clear button without touching the input element
+  const btn = document.getElementById('clearSearch');
+  if (btn) btn.classList.toggle('visible', val.length > 0);
   clearTimeout(searchTimeout);
   searchTimeout = setTimeout(() => {
     // When typing clears a sheet context in global search mode, update sidebar
