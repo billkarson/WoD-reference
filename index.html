@@ -223,7 +223,7 @@
   main::-webkit-scrollbar-thumb { background: var(--border-glow); border-radius: 2px; }
 
   /* ── SEARCH BAR ── */
-  .search-bar { display: flex; flex-direction: column; gap: 8px; }
+  #searchContainer { display: flex; flex-direction: column; gap: 8px; }
 
   .search-wrap { position: relative; }
 
@@ -538,7 +538,12 @@
 
 <div class="app">
   <aside id="sidebar"></aside>
-  <main id="main"></main>
+  <main id="main">
+    <!-- Search bar lives here permanently — never destroyed while typing -->
+    <div id="searchContainer"></div>
+    <!-- Only this area is swapped out on each search/navigation -->
+    <div id="resultsContainer"></div>
+  </main>
 </div>
 
 <script>
@@ -582,7 +587,8 @@ async function loadData() {
     DATA = await res.json();
     document.getElementById('loading').classList.add('hidden');
     buildSidebar();
-    renderMain();
+    renderSearchBar();
+    renderResults();
   } catch(e) {
     document.getElementById('loading').innerHTML =
       `<div class="load-title" style="color:#c0392b">Failed to load data.json</div>
@@ -626,7 +632,8 @@ function toggleGameline(gl) {
   state.activeGameline = gl;
   state.activeSheet = null;
   buildSidebar();
-  renderMain();
+  renderSearchBar();
+  renderResults();
 }
 
 function selectSheet(name, gl) {
@@ -634,23 +641,56 @@ function selectSheet(name, gl) {
   state.activeGameline = gl;
   state.openGamelines.add(gl);
   state.search = '';
-  const inp = document.getElementById('searchInput');
-  if (inp) inp.value = '';
   buildSidebar();
-  renderMain();
+  renderSearchBar();   // re-render search bar to update placeholder & filters
+  renderResults();
   // update mobile header label
   const lbl = document.getElementById('activeSheetLabel');
   if (lbl) lbl.textContent = name;
   if (isMobile()) closeDrawer();
 }
 
-// ── RENDER ──
-function renderMain() {
-  const main = document.getElementById('main');
+// ── SEARCH BAR (persistent — rendered on sheet/context change, NOT on every keystroke) ──
+function renderSearchBar() {
+  const sc = document.getElementById('searchContainer');
+  if (!DATA) return;
+
+  const placeholder = state.activeSheet
+    ? `Search ${escH(state.activeSheet)}…`
+    : 'Search all gamelines…';
+
+  const sheet = state.activeSheet ? DATA.sheets[state.activeSheet] : null;
+  const showLarp = sheet && sheet.hasLarp;
+  const showBack = !!state.activeSheet;
+
+  let filterHtml = '';
+  if (showLarp || showBack) {
+    filterHtml = `<div class="filter-row">
+      <span class="filter-label">Filter:</span>
+      ${showLarp ? `<button class="toggle-btn ${state.larpOnly?'active':''}" id="larpBtn" onclick="toggleLarp()">✦ LARP Only</button>` : ''}
+      ${showBack ? `<button class="toggle-btn" onclick="goAll()">← All</button>` : ''}
+    </div>`;
+  }
+
+  sc.innerHTML = `
+    <div class="search-wrap">
+      <span class="search-icon">⌕</span>
+      <input id="searchInput" type="search" inputmode="search" autocomplete="off" autocorrect="off"
+        placeholder="${placeholder}"
+        value="${escH(state.search)}" oninput="onSearch(this.value)">
+    </div>
+    ${filterHtml}`;
+}
+
+// ── RESULTS ONLY ── (called on every search keystroke — does NOT touch #searchInput)
+function renderResults() {
+  const rc = document.getElementById('resultsContainer');
+  if (!DATA) return;
+
   const q = state.search.trim().toLowerCase();
 
-  if (q.length >= 2 && !state.activeSheet) { renderGlobalSearch(q); return; }
-  if (!state.activeSheet) { renderWelcome(); return; }
+  if (q.length >= 2 && !state.activeSheet) { renderGlobalSearchResults(q, rc); return; }
+  if (!state.activeSheet) { renderWelcomeResults(rc); return; }
 
   const sheet = DATA.sheets[state.activeSheet];
   if (!sheet) return;
@@ -664,19 +704,6 @@ function renderMain() {
   const cols = sheet.columns;
 
   let html = `
-    <div class="search-bar">
-      <div class="search-wrap">
-        <span class="search-icon">⌕</span>
-        <input id="searchInput" type="search" inputmode="search" autocomplete="off" autocorrect="off"
-          placeholder="Search ${escH(state.activeSheet)}…"
-          value="${escH(state.search)}" oninput="onSearch(this.value)">
-      </div>
-      <div class="filter-row">
-        <span class="filter-label">Filter:</span>
-        ${sheet.hasLarp ? `<button class="toggle-btn ${state.larpOnly?'active':''}" onclick="toggleLarp()">✦ LARP Only</button>` : ''}
-        <button class="toggle-btn" onclick="state.activeSheet=null;buildSidebar();renderMain()">← All</button>
-      </div>
-    </div>
     <div class="content-header">
       <div>
         <div class="content-title">${escH(state.activeSheet)}</div>
@@ -693,24 +720,14 @@ function renderMain() {
     html += renderTable(rows, cols, q, null);
   }
 
-  main.innerHTML = html;
-  refocusSearch();
+  rc.innerHTML = html;
 }
 
-function renderWelcome() {
-  const main = document.getElementById('main');
+function renderWelcomeResults(rc) {
   const totalRows = Object.values(DATA.sheets).reduce((a,s) => a+s.rows.length, 0);
   const totalSheets = Object.keys(DATA.sheets).length;
 
-  main.innerHTML = `
-    <div class="search-bar">
-      <div class="search-wrap">
-        <span class="search-icon">⌕</span>
-        <input id="searchInput" type="search" inputmode="search" autocomplete="off"
-          placeholder="Search all gamelines…"
-          value="${escH(state.search)}" oninput="onSearch(this.value)">
-      </div>
-    </div>
+  rc.innerHTML = `
     <div class="welcome">
       <div class="welcome-symbol">✦</div>
       <h2>Old World of Darkness — MET Index</h2>
@@ -724,8 +741,7 @@ function renderWelcome() {
     </div>`;
 }
 
-function renderGlobalSearch(q) {
-  const main = document.getElementById('main');
+function renderGlobalSearchResults(q, rc) {
   const results = [];
 
   for (const [name, sheet] of Object.entries(DATA.sheets)) {
@@ -738,19 +754,11 @@ function renderGlobalSearch(q) {
 
   const totalHits = results.reduce((a,r) => a+r.rows.length, 0);
 
+  // Update larp button state without touching the input
+  const larpBtn = document.getElementById('larpBtn');
+  if (larpBtn) larpBtn.className = `toggle-btn ${state.larpOnly?'active':''}`;
+
   let html = `
-    <div class="search-bar">
-      <div class="search-wrap">
-        <span class="search-icon">⌕</span>
-        <input id="searchInput" type="search" inputmode="search" autocomplete="off"
-          placeholder="Search all gamelines…"
-          value="${escH(state.search)}" oninput="onSearch(this.value)">
-      </div>
-      <div class="filter-row">
-        <span class="filter-label">Filter:</span>
-        <button class="toggle-btn ${state.larpOnly?'active':''}" onclick="toggleLarp()">✦ LARP Only</button>
-      </div>
-    </div>
     <div class="content-header">
       <div class="content-title">Search: "${escH(state.search)}"</div>
       <div class="result-count">${totalHits.toLocaleString()} in ${results.length} categories</div>
@@ -779,8 +787,7 @@ function renderGlobalSearch(q) {
     }
   }
 
-  main.innerHTML = html;
-  refocusSearch();
+  rc.innerHTML = html;
 }
 
 // ── TABLE (desktop) ──
@@ -862,11 +869,11 @@ function escH(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-function refocusSearch() {
-  if (state.search) {
-    const inp = document.getElementById('searchInput');
-    if (inp && !isMobile()) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
-  }
+function goAll() {
+  state.activeSheet = null;
+  buildSidebar();
+  renderSearchBar();
+  renderResults();
 }
 
 let searchTimeout;
@@ -874,16 +881,24 @@ function onSearch(val) {
   state.search = val;
   clearTimeout(searchTimeout);
   searchTimeout = setTimeout(() => {
+    // When typing clears a sheet context in global search mode, update sidebar
     if (!state.activeSheet || val.length >= 2) { state.activeSheet = null; buildSidebar(); }
-    renderMain();
+    // Only update results — NEVER touch #searchInput — keyboard stays open
+    renderResults();
   }, 250);
 }
 
-function toggleLarp() { state.larpOnly = !state.larpOnly; renderMain(); }
+function toggleLarp() {
+  state.larpOnly = !state.larpOnly;
+  // Update larp button appearance without re-rendering the search bar
+  const btn = document.getElementById('larpBtn');
+  if (btn) btn.className = `toggle-btn ${state.larpOnly?'active':''}`;
+  renderResults();
+}
 
 window.addEventListener('resize', () => {
   if (!isMobile()) closeDrawer();
-  if (state.activeSheet || state.search) renderMain();
+  if (state.activeSheet || state.search) renderResults();
 });
 
 loadData();
