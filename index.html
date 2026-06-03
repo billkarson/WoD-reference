@@ -1,0 +1,1030 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>oWoD MET Index</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0d0b08;
+    --surface: #161310;
+    --surface2: #1e1a15;
+    --border: #2e2820;
+    --border-glow: #5c3d1e;
+    --gold: #c9973a;
+    --gold-light: #e8b96a;
+    --gold-dim: #7a5a22;
+    --crimson: #8b1a1a;
+    --crimson-bright: #c0392b;
+    --text: #d4c4a8;
+    --text-dim: #7a6e5e;
+    --text-bright: #f0e6cc;
+    --larp-badge: #1a3a1a;
+    --larp-text: #5aaf5a;
+    --accent-green: #2a4a2a;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Crimson Text', Georgia, serif;
+    font-size: 16px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Subtle texture overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.4;
+  }
+
+  /* ── HEADER ── */
+  header {
+    position: relative;
+    border-bottom: 1px solid var(--border-glow);
+    background: linear-gradient(180deg, #0a0806 0%, var(--surface) 100%);
+    padding: 28px 40px 24px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    z-index: 10;
+  }
+
+  header::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--gold), transparent);
+  }
+
+  .header-emblem {
+    font-family: 'Cinzel', serif;
+    font-size: 28px;
+    color: var(--gold);
+    line-height: 1;
+    flex-shrink: 0;
+    text-shadow: 0 0 20px rgba(201,151,58,0.4);
+  }
+
+  .header-title h1 {
+    font-family: 'Cinzel', serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: var(--text-bright);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .header-title p {
+    font-size: 13px;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+    margin-top: 2px;
+  }
+
+  /* ── LAYOUT ── */
+  .app {
+    display: grid;
+    grid-template-columns: 260px 1fr;
+    min-height: calc(100vh - 81px);
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ── SIDEBAR ── */
+  aside {
+    border-right: 1px solid var(--border);
+    background: var(--surface);
+    padding: 20px 0;
+    position: sticky;
+    top: 0;
+    height: calc(100vh - 81px);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-glow) transparent;
+  }
+
+  aside::-webkit-scrollbar { width: 4px; }
+  aside::-webkit-scrollbar-track { background: transparent; }
+  aside::-webkit-scrollbar-thumb { background: var(--border-glow); border-radius: 2px; }
+
+  .sidebar-section {
+    margin-bottom: 4px;
+  }
+
+  .gameline-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px 20px;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-family: 'Cinzel', serif;
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s;
+    position: relative;
+  }
+
+  .gameline-btn:hover { color: var(--gold-light); background: rgba(201,151,58,0.05); }
+
+  .gameline-btn.active {
+    color: var(--gold-light);
+    background: rgba(201,151,58,0.08);
+  }
+
+  .gameline-btn.active::before {
+    content: '';
+    position: absolute;
+    left: 0; top: 0; bottom: 0;
+    width: 2px;
+    background: var(--gold);
+  }
+
+  .gameline-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .gameline-count {
+    margin-left: auto;
+    font-family: 'Crimson Text', serif;
+    font-size: 11px;
+    color: var(--text-dim);
+    background: var(--surface2);
+    padding: 1px 6px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+  }
+
+  .sheet-list {
+    display: none;
+    padding: 4px 0 8px 0;
+  }
+
+  .sheet-list.open { display: block; }
+
+  .sheet-btn {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 7px 20px 7px 38px;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-family: 'Crimson Text', serif;
+    font-size: 14px;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.15s;
+  }
+
+  .sheet-btn:hover { color: var(--text); background: rgba(255,255,255,0.03); }
+
+  .sheet-btn.active {
+    color: var(--gold-light);
+    background: rgba(201,151,58,0.06);
+  }
+
+  .sheet-row-count {
+    margin-left: auto;
+    font-size: 11px;
+    color: var(--text-dim);
+    opacity: 0.7;
+  }
+
+  /* ── MAIN CONTENT ── */
+  main {
+    padding: 24px 32px;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* ── SEARCH BAR ── */
+  .search-bar {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .search-wrap {
+    position: relative;
+    flex: 1;
+    min-width: 280px;
+  }
+
+  .search-icon {
+    position: absolute;
+    left: 14px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-dim);
+    font-size: 16px;
+    pointer-events: none;
+  }
+
+  #searchInput {
+    width: 100%;
+    padding: 11px 16px 11px 42px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-bright);
+    font-family: 'Crimson Text', serif;
+    font-size: 16px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  #searchInput:focus { border-color: var(--gold-dim); }
+  #searchInput::placeholder { color: var(--text-dim); }
+
+  .filter-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .filter-label {
+    font-size: 12px;
+    color: var(--text-dim);
+    font-family: 'Cinzel', serif;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  .toggle-btn {
+    padding: 7px 14px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-dim);
+    font-family: 'Crimson Text', serif;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .toggle-btn:hover { border-color: var(--gold-dim); color: var(--text); }
+
+  .toggle-btn.active {
+    background: var(--larp-badge);
+    border-color: var(--larp-text);
+    color: var(--larp-text);
+  }
+
+  /* ── CONTENT PANEL ── */
+  .content-header {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 14px;
+  }
+
+  .content-title {
+    font-family: 'Cinzel', serif;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--text-bright);
+    letter-spacing: 0.05em;
+  }
+
+  .content-subtitle {
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  .result-count {
+    margin-left: auto;
+    font-size: 13px;
+    color: var(--text-dim);
+  }
+
+  /* ── TABLE ── */
+  .table-wrap {
+    overflow-x: auto;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    max-height: calc(100vh - 280px);
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-glow) transparent;
+  }
+
+  .table-wrap::-webkit-scrollbar { width: 6px; height: 6px; }
+  .table-wrap::-webkit-scrollbar-track { background: var(--surface); }
+  .table-wrap::-webkit-scrollbar-thumb { background: var(--border-glow); border-radius: 3px; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+
+  thead {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+
+  th {
+    background: var(--surface2);
+    color: var(--gold);
+    font-family: 'Cinzel', serif;
+    font-size: 11px;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border-glow);
+    white-space: nowrap;
+    font-weight: 600;
+  }
+
+  thead::after {
+    content: '';
+    display: block;
+    height: 1px;
+    background: linear-gradient(90deg, var(--gold-dim), transparent);
+    position: sticky;
+    top: 38px;
+  }
+
+  td {
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    vertical-align: top;
+    line-height: 1.4;
+  }
+
+  tr:last-child td { border-bottom: none; }
+
+  tr:hover td {
+    background: rgba(201,151,58,0.04);
+  }
+
+  td.primary-col {
+    color: var(--text-bright);
+    font-weight: 600;
+  }
+
+  td.page-col {
+    color: var(--gold-dim);
+    font-family: 'Cinzel', serif;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  td.book-col {
+    color: var(--text-dim);
+    font-size: 13px;
+    font-style: italic;
+  }
+
+  /* LARP badge */
+  .larp-badge {
+    display: inline-block;
+    background: var(--larp-badge);
+    color: var(--larp-text);
+    border: 1px solid var(--accent-green);
+    font-family: 'Cinzel', serif;
+    font-size: 9px;
+    letter-spacing: 0.08em;
+    padding: 1px 5px;
+    border-radius: 2px;
+    text-transform: uppercase;
+    vertical-align: middle;
+    margin-left: 6px;
+  }
+
+  /* ── GLOBAL SEARCH MODE ── */
+  .global-result-group {
+    margin-bottom: 24px;
+  }
+
+  .global-group-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 8px;
+    cursor: pointer;
+  }
+
+  .global-group-header h3 {
+    font-family: 'Cinzel', serif;
+    font-size: 13px;
+    color: var(--gold);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .global-group-header .gameline-tag {
+    font-size: 11px;
+    color: var(--text-dim);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 1px 7px;
+    border-radius: 10px;
+    font-family: 'Cinzel', serif;
+    letter-spacing: 0.05em;
+  }
+
+  .global-group-count {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--text-dim);
+  }
+
+  /* ── EMPTY STATE ── */
+  .empty-state {
+    text-align: center;
+    padding: 80px 20px;
+    color: var(--text-dim);
+  }
+
+  .empty-state .empty-icon {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: 0.4;
+  }
+
+  .empty-state h3 {
+    font-family: 'Cinzel', serif;
+    font-size: 16px;
+    color: var(--text-dim);
+    margin-bottom: 8px;
+    letter-spacing: 0.08em;
+  }
+
+  .empty-state p {
+    font-size: 14px;
+    color: var(--text-dim);
+    opacity: 0.7;
+  }
+
+  /* ── WELCOME ── */
+  .welcome {
+    max-width: 600px;
+    margin: 60px auto;
+    text-align: center;
+  }
+
+  .welcome-symbol {
+    font-size: 48px;
+    color: var(--gold-dim);
+    margin-bottom: 24px;
+    opacity: 0.6;
+  }
+
+  .welcome h2 {
+    font-family: 'Cinzel', serif;
+    font-size: 20px;
+    color: var(--text-bright);
+    margin-bottom: 12px;
+    letter-spacing: 0.08em;
+  }
+
+  .welcome p {
+    color: var(--text-dim);
+    line-height: 1.6;
+    margin-bottom: 20px;
+  }
+
+  .welcome-stats {
+    display: flex;
+    gap: 24px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-top: 32px;
+  }
+
+  .stat-box {
+    text-align: center;
+    padding: 16px 24px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+  }
+
+  .stat-num {
+    font-family: 'Cinzel', serif;
+    font-size: 24px;
+    color: var(--gold);
+    display: block;
+  }
+
+  .stat-label {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 4px;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+  }
+
+  /* ── GAMELINE COLORS ── */
+  .dot-General    { background: #888; }
+  .dot-Vampire    { background: #8b1a1a; }
+  .dot-Kuei-jin  { background: #a0522d; }
+  .dot-Mortals    { background: #4a6a8a; }
+  .dot-Changeling { background: #6a4a8a; }
+  .dot-Mage       { background: #1a4a6a; }
+  .dot-Werewolf   { background: #3a5a2a; }
+  .dot-Wraith     { background: #4a4a4a; }
+  .dot-Mummy      { background: #7a6a2a; }
+  .dot-Inquisition{ background: #6a3a1a; }
+  .dot-Dark\ Ages { background: #5a4a3a; }
+  .dot-Demon      { background: #5a1a5a; }
+  .dot-Hunter     { background: #2a4a5a; }
+
+  mark {
+    background: rgba(201,151,58,0.25);
+    color: var(--gold-light);
+    border-radius: 2px;
+    padding: 0 1px;
+  }
+
+  .chevron {
+    transition: transform 0.2s;
+    color: var(--text-dim);
+    font-size: 12px;
+  }
+  .chevron.open { transform: rotate(90deg); }
+
+  /* loading */
+  #loading {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    gap: 16px;
+  }
+
+  #loading .load-title {
+    font-family: 'Cinzel', serif;
+    font-size: 18px;
+    color: var(--gold);
+    letter-spacing: 0.1em;
+  }
+
+  .load-bar {
+    width: 200px;
+    height: 2px;
+    background: var(--border);
+    border-radius: 1px;
+    overflow: hidden;
+  }
+
+  .load-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--gold-dim), var(--gold));
+    animation: loadpulse 1.5s ease-in-out infinite;
+  }
+
+  @keyframes loadpulse {
+    0% { width: 0%; margin-left: 0; }
+    50% { width: 60%; margin-left: 20%; }
+    100% { width: 0%; margin-left: 100%; }
+  }
+
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="load-title">oWoD MET Index</div>
+  <div class="load-bar"><div class="load-bar-fill"></div></div>
+  <div style="font-size:13px;color:var(--text-dim);">Loading chronicles…</div>
+</div>
+
+<header>
+  <div class="header-emblem">✦</div>
+  <div class="header-title">
+    <h1>Old World of Darkness — MET Index</h1>
+    <p>Mind's Eye Theatre Reference — All Gamelines</p>
+  </div>
+</header>
+
+<div class="app">
+  <aside id="sidebar"></aside>
+  <main id="main"></main>
+</div>
+
+<script>
+// ── STATE ──
+let DATA = null;
+let state = {
+  activeGameline: null,
+  activeSheet: null,
+  search: '',
+  larpOnly: false,
+  openGamelines: new Set(),
+};
+
+const GAMELINE_COLORS = {
+  'General': '#888', 'Vampire': '#8b1a1a', 'Kuei-jin': '#a0522d',
+  'Mortals': '#4a6a8a', 'Changeling': '#6a4a8a', 'Mage': '#1a4a6a',
+  'Werewolf': '#3a5a2a', 'Wraith': '#4a4a4a', 'Mummy': '#7a6a2a',
+  'Inquisition': '#6a3a1a', 'Dark Ages': '#5a4a3a', 'Demon': '#5a1a5a',
+  'Hunter': '#2a4a5a',
+};
+
+// ── LOAD DATA ──
+async function loadData() {
+  try {
+    const res = await fetch('data.json');
+    DATA = await res.json();
+    document.getElementById('loading').classList.add('hidden');
+    buildSidebar();
+    renderMain();
+  } catch (e) {
+    document.getElementById('loading').innerHTML =
+      `<div class="load-title" style="color:#c0392b">Failed to load data.json</div>
+       <p style="color:var(--text-dim);font-size:14px;margin-top:12px">Make sure data.json is in the same folder as index.html</p>`;
+  }
+}
+
+// ── SIDEBAR ──
+function buildSidebar() {
+  const sidebar = document.getElementById('sidebar');
+  const gamelines = DATA.gamelines;
+
+  let html = '';
+  for (const gl of gamelines) {
+    const sheets = Object.entries(DATA.sheets).filter(([, s]) => s.gameline === gl);
+    const totalRows = sheets.reduce((a, [, s]) => a + s.rows.length, 0);
+    const color = GAMELINE_COLORS[gl] || '#888';
+    const isOpen = state.openGamelines.has(gl);
+    const isActive = state.activeGameline === gl;
+
+    html += `
+      <div class="sidebar-section" data-gameline="${gl}">
+        <button class="gameline-btn ${isActive ? 'active' : ''}" onclick="toggleGameline('${gl}')">
+          <span class="gameline-dot" style="background:${color}"></span>
+          ${gl}
+          <span class="gameline-count">${totalRows.toLocaleString()}</span>
+          <span class="chevron ${isOpen ? 'open' : ''}">›</span>
+        </button>
+        <div class="sheet-list ${isOpen ? 'open' : ''}">
+    `;
+
+    for (const [sheetName, sheet] of sheets) {
+      const isSheetActive = state.activeSheet === sheetName;
+      html += `
+        <button class="sheet-btn ${isSheetActive ? 'active' : ''}" onclick="selectSheet('${sheetName}', '${gl}')">
+          ${sheetName}
+          <span class="sheet-row-count">${sheet.rows.length.toLocaleString()}</span>
+        </button>
+      `;
+    }
+
+    html += `</div></div>`;
+  }
+
+  sidebar.innerHTML = html;
+}
+
+function toggleGameline(gl) {
+  if (state.openGamelines.has(gl)) {
+    state.openGamelines.delete(gl);
+  } else {
+    state.openGamelines.add(gl);
+  }
+  state.activeGameline = gl;
+  state.activeSheet = null;
+  buildSidebar();
+  renderMain();
+}
+
+function selectSheet(sheetName, gl) {
+  state.activeSheet = sheetName;
+  state.activeGameline = gl;
+  state.openGamelines.add(gl);
+  state.search = '';
+  document.getElementById('searchInput').value = '';
+  buildSidebar();
+  renderMain();
+}
+
+// ── MAIN RENDER ──
+function renderMain() {
+  const main = document.getElementById('main');
+  const q = state.search.trim().toLowerCase();
+
+  // Global search mode
+  if (q.length >= 2 && !state.activeSheet) {
+    renderGlobalSearch(q);
+    return;
+  }
+
+  // No sheet selected
+  if (!state.activeSheet) {
+    renderWelcome();
+    return;
+  }
+
+  const sheet = DATA.sheets[state.activeSheet];
+  if (!sheet) return;
+
+  let rows = sheet.rows;
+
+  // Filter: larp only
+  if (state.larpOnly && sheet.hasLarp) {
+    rows = rows.filter(r => {
+      const v = r['Larp Version'];
+      return v && String(v).trim().toUpperCase() === 'Y';
+    });
+  }
+
+  // Filter: search
+  if (q.length >= 1) {
+    rows = rows.filter(r =>
+      Object.values(r).some(v => v && String(v).toLowerCase().includes(q))
+    );
+  }
+
+  const cols = sheet.columns;
+  const primaryCol = cols[0];
+
+  let html = `
+    <div class="search-bar">
+      <div class="search-wrap">
+        <span class="search-icon">⌕</span>
+        <input id="searchInput" type="text" placeholder="Search across all sheets or within ${state.activeSheet}…"
+          value="${escapeHtml(state.search)}" oninput="onSearch(this.value)">
+      </div>
+      <div class="filter-row">
+        <span class="filter-label">Filter:</span>
+        ${sheet.hasLarp ? `<button class="toggle-btn ${state.larpOnly ? 'active' : ''}" onclick="toggleLarp()">LARP Only</button>` : ''}
+      </div>
+    </div>
+
+    <div class="content-header">
+      <div>
+        <div class="content-title">${state.activeSheet}</div>
+        <div class="content-subtitle">${state.activeGameline}</div>
+      </div>
+      <div class="result-count">${rows.length.toLocaleString()} entries</div>
+    </div>
+  `;
+
+  if (rows.length === 0) {
+    html += `<div class="empty-state">
+      <div class="empty-icon">⊘</div>
+      <h3>No Results Found</h3>
+      <p>Try adjusting your search or filters.</p>
+    </div>`;
+  } else {
+    html += `<div class="table-wrap"><table>
+      <thead><tr>`;
+    for (const col of cols) {
+      html += `<th>${escapeHtml(col)}</th>`;
+    }
+    html += `</tr></thead><tbody>`;
+
+    for (const row of rows) {
+      html += `<tr>`;
+      for (let i = 0; i < cols.length; i++) {
+        const col = cols[i];
+        const val = row[col];
+        const display = val == null ? '' : String(val);
+
+        if (col === 'Larp Version') {
+          const isY = display.trim().toUpperCase() === 'Y';
+          html += `<td>${isY ? '<span class="larp-badge">LARP</span>' : ''}</td>`;
+        } else if (i === 0) {
+          html += `<td class="primary-col">${highlight(display, q)}</td>`;
+        } else if (col === 'Page' || col === 'Page Number' || col === 'Page.1') {
+          html += `<td class="page-col">${escapeHtml(display)}</td>`;
+        } else if (col === 'Book') {
+          html += `<td class="book-col">${highlight(display, q)}</td>`;
+        } else {
+          html += `<td>${highlight(display, q)}</td>`;
+        }
+      }
+      html += `</tr>`;
+    }
+
+    html += `</tbody></table></div>`;
+  }
+
+  main.innerHTML = html;
+  // Re-focus search if was typing
+  if (state.search) {
+    const inp = document.getElementById('searchInput');
+    if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+  }
+}
+
+function renderWelcome() {
+  const main = document.getElementById('main');
+  const totalRows = Object.values(DATA.sheets).reduce((a, s) => a + s.rows.length, 0);
+  const totalSheets = Object.keys(DATA.sheets).length;
+
+  main.innerHTML = `
+    <div class="search-bar">
+      <div class="search-wrap">
+        <span class="search-icon">⌕</span>
+        <input id="searchInput" type="text" placeholder="Search across all gamelines…"
+          value="${escapeHtml(state.search)}" oninput="onSearch(this.value)">
+      </div>
+    </div>
+
+    <div class="welcome">
+      <div class="welcome-symbol">✦</div>
+      <h2>Old World of Darkness — MET Reference Index</h2>
+      <p>Select a gameline and sheet from the sidebar, or search across all content above.</p>
+      <div class="welcome-stats">
+        <div class="stat-box">
+          <span class="stat-num">${totalRows.toLocaleString()}</span>
+          <div class="stat-label">Total Entries</div>
+        </div>
+        <div class="stat-box">
+          <span class="stat-num">${totalSheets}</span>
+          <div class="stat-label">Categories</div>
+        </div>
+        <div class="stat-box">
+          <span class="stat-num">${DATA.gamelines.length}</span>
+          <div class="stat-label">Gamelines</div>
+        </div>
+        <div class="stat-box">
+          <span class="stat-num">${DATA.books.length}</span>
+          <div class="stat-label">Source Books</div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderGlobalSearch(q) {
+  const main = document.getElementById('main');
+  const results = [];
+
+  for (const [sheetName, sheet] of Object.entries(DATA.sheets)) {
+    let rows = sheet.rows.filter(r =>
+      Object.values(r).some(v => v && String(v).toLowerCase().includes(q))
+    );
+    if (state.larpOnly && sheet.hasLarp) {
+      rows = rows.filter(r => {
+        const v = r['Larp Version'];
+        return v && String(v).trim().toUpperCase() === 'Y';
+      });
+    }
+    if (rows.length > 0) {
+      results.push({ sheetName, sheet, rows });
+    }
+  }
+
+  const totalHits = results.reduce((a, r) => a + r.rows.length, 0);
+
+  let html = `
+    <div class="search-bar">
+      <div class="search-wrap">
+        <span class="search-icon">⌕</span>
+        <input id="searchInput" type="text" placeholder="Search across all gamelines…"
+          value="${escapeHtml(state.search)}" oninput="onSearch(this.value)">
+      </div>
+      <div class="filter-row">
+        <span class="filter-label">Filter:</span>
+        <button class="toggle-btn ${state.larpOnly ? 'active' : ''}" onclick="toggleLarp()">LARP Only</button>
+      </div>
+    </div>
+    <div class="content-header">
+      <div class="content-title">Global Search: "${escapeHtml(state.search)}"</div>
+      <div class="result-count">${totalHits.toLocaleString()} results across ${results.length} categories</div>
+    </div>
+  `;
+
+  if (results.length === 0) {
+    html += `<div class="empty-state">
+      <div class="empty-icon">⊘</div>
+      <h3>No Results Found</h3>
+      <p>Try a different search term.</p>
+    </div>`;
+  } else {
+    const color = GAMELINE_COLORS;
+    for (const { sheetName, sheet, rows } of results) {
+      const gl = sheet.gameline;
+      const cols = sheet.columns;
+      const primaryCol = cols[0];
+      // Show max 50 per group
+      const shown = rows.slice(0, 50);
+
+      html += `<div class="global-result-group">
+        <div class="global-group-header" onclick="selectSheet('${sheetName}', '${gl}')">
+          <span class="gameline-dot" style="background:${color[gl]||'#888'};width:8px;height:8px;border-radius:50%;display:inline-block"></span>
+          <h3>${sheetName}</h3>
+          <span class="gameline-tag">${gl}</span>
+          <span class="global-group-count">${rows.length} match${rows.length !== 1 ? 'es' : ''} ${rows.length > 50 ? '(showing 50)' : ''}</span>
+        </div>
+        <div class="table-wrap" style="max-height:240px">
+        <table><thead><tr>`;
+
+      // Show first few meaningful cols only
+      const displayCols = cols.slice(0, 5);
+      for (const col of displayCols) html += `<th>${escapeHtml(col)}</th>`;
+      html += `</tr></thead><tbody>`;
+
+      for (const row of shown) {
+        html += `<tr>`;
+        for (let i = 0; i < displayCols.length; i++) {
+          const col = displayCols[i];
+          const val = row[col];
+          const display = val == null ? '' : String(val);
+
+          if (col === 'Larp Version') {
+            const isY = display.trim().toUpperCase() === 'Y';
+            html += `<td>${isY ? '<span class="larp-badge">LARP</span>' : ''}</td>`;
+          } else if (i === 0) {
+            html += `<td class="primary-col">${highlight(display, q)}</td>`;
+          } else if (col === 'Page' || col === 'Page Number') {
+            html += `<td class="page-col">${escapeHtml(display)}</td>`;
+          } else if (col === 'Book') {
+            html += `<td class="book-col">${highlight(display, q)}</td>`;
+          } else {
+            html += `<td>${highlight(display, q)}</td>`;
+          }
+        }
+        html += `</tr>`;
+      }
+
+      html += `</tbody></table></div></div>`;
+    }
+  }
+
+  main.innerHTML = html;
+  const inp = document.getElementById('searchInput');
+  if (inp) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+}
+
+// ── HELPERS ──
+function highlight(text, q) {
+  if (!q || !text) return escapeHtml(text);
+  const safe = escapeHtml(text);
+  const safeQ = escapeHtml(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return safe.replace(new RegExp(`(${safeQ})`, 'gi'), '<mark>$1</mark>');
+}
+
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+let searchTimeout;
+function onSearch(val) {
+  state.search = val;
+  clearTimeout(searchTimeout);
+  searchTimeout = setTimeout(() => {
+    if (!state.activeSheet || val.length >= 2) {
+      state.activeSheet = null;
+      buildSidebar();
+    }
+    renderMain();
+  }, 200);
+}
+
+function toggleLarp() {
+  state.larpOnly = !state.larpOnly;
+  renderMain();
+}
+
+// ── INIT ──
+loadData();
+</script>
+</body>
+</html>
