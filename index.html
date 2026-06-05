@@ -442,147 +442,6 @@
   .stat-label { font-size: 11px; color: var(--text-dim); margin-top: 4px; letter-spacing: 0.05em; text-transform: uppercase; }
 
   mark { background: rgba(201,151,58,0.25); color: var(--gold-light); border-radius: 2px; padding: 0 1px; }
-  /* ── OWBN LEVELS ── */
-  .levels-block { margin-top: 8px; display: flex; flex-direction: column; gap: 10px; }
-  .level-entry { border-left: 2px solid var(--border-glow); padding-left: 10px; }
-  .level-header { display: flex; align-items: baseline; gap: 8px; margin-bottom: 3px; }
-  .level-dot { font-family: 'Cinzel', serif; color: var(--gold); font-size: 13px; flex-shrink: 0; letter-spacing: 2px; }
-  .level-name { font-family: 'Crimson Text', serif; font-size: 14px; font-weight: 600; color: var(--text-bright); }
-  .level-desc { font-size: 13px; color: var(--text); line-height: 1.5; }
-
-  /* ── BOOK FILTER PANEL ── */
-  .book-filter-panel {
-    background: var(--surface);
-    border: 1px solid var(--border-glow);
-    border-radius: 6px;
-    overflow: hidden;
-    animation: slideDown 0.15s ease;
-  }
-
-  @keyframes slideDown {
-    from { opacity: 0; transform: translateY(-6px); }
-    to   { opacity: 1; transform: translateY(0); }
-  }
-
-  .book-filter-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 8px 12px;
-    border-bottom: 1px solid var(--border);
-    background: var(--surface2);
-  }
-
-  .book-filter-search {
-    flex: 1;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    border-radius: 4px;
-    padding: 5px 10px;
-    color: var(--text-bright);
-    font-family: 'Crimson Text', serif;
-    font-size: 14px;
-    outline: none;
-    min-width: 0;
-  }
-  .book-filter-search:focus { border-color: var(--gold-dim); }
-  .book-filter-search::placeholder { color: var(--text-dim); }
-
-  .book-filter-clear {
-    background: none;
-    border: none;
-    color: var(--text-dim);
-    font-size: 18px;
-    cursor: pointer;
-    padding: 2px 6px;
-    border-radius: 3px;
-    line-height: 1;
-    flex-shrink: 0;
-  }
-  .book-filter-clear:hover { color: var(--text-bright); background: rgba(255,255,255,0.05); }
-
-  .book-filter-label {
-    font-family: 'Cinzel', serif;
-    font-size: 10px;
-    color: var(--text-dim);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    white-space: nowrap;
-    flex-shrink: 0;
-  }
-
-  .book-list {
-    max-height: 220px;
-    overflow-y: auto;
-    scrollbar-width: thin;
-    scrollbar-color: var(--border-glow) transparent;
-  }
-  .book-list::-webkit-scrollbar { width: 4px; }
-  .book-list::-webkit-scrollbar-thumb { background: var(--border-glow); border-radius: 2px; }
-
-  .book-item {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
-    padding: 8px 14px;
-    background: none;
-    border: none;
-    border-bottom: 1px solid var(--border);
-    color: var(--text-dim);
-    font-family: 'Crimson Text', serif;
-    font-size: 14px;
-    cursor: pointer;
-    text-align: left;
-    transition: all 0.12s;
-    min-height: 38px;
-  }
-  .book-item:last-child { border-bottom: none; }
-  .book-item:hover, .book-item:active { color: var(--text-bright); background: rgba(201,151,58,0.05); }
-  .book-item.active { color: var(--gold-light); background: rgba(201,151,58,0.1); }
-  .book-item.active::before {
-    content: '✦';
-    font-size: 9px;
-    color: var(--gold);
-    flex-shrink: 0;
-  }
-
-  .book-item-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .book-item-count {
-    font-family: 'Cinzel', serif;
-    font-size: 10px;
-    color: var(--text-dim);
-    background: var(--surface2);
-    border: 1px solid var(--border);
-    padding: 1px 6px;
-    border-radius: 8px;
-    flex-shrink: 0;
-  }
-  .book-item.active .book-item-count { border-color: var(--gold-dim); color: var(--gold-dim); }
-
-  .book-filter-none { padding: 14px; text-align: center; color: var(--text-dim); font-size: 13px; font-style: italic; }
-
-  /* active book badge shown in filter row */
-  .active-book-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    background: rgba(201,151,58,0.12);
-    border: 1px solid var(--gold-dim);
-    border-radius: 4px;
-    padding: 4px 10px 4px 10px;
-    font-family: 'Crimson Text', serif;
-    font-size: 13px;
-    color: var(--gold-light);
-    cursor: pointer;
-    max-width: 260px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    transition: background 0.12s;
-  }
-  .active-book-badge:hover { background: rgba(201,151,58,0.2); }
-  .active-book-badge .badge-x { font-size: 15px; color: var(--gold-dim); flex-shrink: 0; margin-left: 2px; }
 
   /* ── MOBILE OVERLAY ── */
   #drawerOverlay {
@@ -692,9 +551,6 @@ let state = {
   activeSheet: null,
   search: '',
   larpOnly: false,
-  bookFilter: null,      // currently selected book string, or null
-  bookPanelOpen: false,  // whether the book picker panel is visible
-  bookSearch: '',        // search within the book list
   openGamelines: new Set(),
 };
 
@@ -719,21 +575,19 @@ function closeDrawer() {
   document.getElementById('drawerOverlay').classList.remove('open');
 }
 
-document.addEventListener('DOMContentLoaded', function () {
-  const overlay = document.getElementById('drawerOverlay');
-  const sidebar = document.getElementById('sidebar');
-  overlay.addEventListener('touchend', function (e) {
-    if (!sidebar.contains(e.target)) {
-      e.preventDefault();
-      closeDrawer();
-    }
+// Fix: the overlay covers the sidebar in the DOM, so iOS fires touchend on
+// the overlay before the sidebar button's click event, stealing the tap.
+// We attach the close handler via JS and guard it with sidebar.contains().
+(function() {
+  var overlay = document.getElementById('drawerOverlay');
+  var sidebar = document.getElementById('sidebar');
+  overlay.addEventListener('touchend', function(e) {
+    if (!sidebar.contains(e.target)) { e.preventDefault(); closeDrawer(); }
   }, { passive: false });
-  overlay.addEventListener('click', function (e) {
-    if (!sidebar.contains(e.target)) {
-      closeDrawer();
-    }
+  overlay.addEventListener('click', function(e) {
+    if (!sidebar.contains(e.target)) { closeDrawer(); }
   });
-});
+})();
 
 // ── LOAD ──
 async function loadData() {
@@ -794,9 +648,6 @@ function selectSheet(name, gl) {
   state.activeGameline = gl;
   state.openGamelines.add(gl);
   state.search = '';
-  state.bookFilter = null;
-  state.bookPanelOpen = false;
-  state.bookSearch = '';
   const inp = document.getElementById('searchInput');
   if (inp) inp.value = '';
   buildSidebar();
@@ -807,117 +658,15 @@ function selectSheet(name, gl) {
   if (isMobile()) closeDrawer();
 }
 
-// ── BOOK FILTER HELPERS ──
-function getBooksForSheet(rows) {
-  const counts = {};
-  for (const row of rows) {
-    const b = row['Book'];
-    if (b && String(b).trim()) {
-      const k = String(b).trim();
-      counts[k] = (counts[k] || 0) + 1;
-    }
-  }
-  return Object.entries(counts).sort((a, b) => a[0].localeCompare(b[0]));
-}
-
-function toggleBookPanel() {
-  state.bookPanelOpen = !state.bookPanelOpen;
-  renderMain();
-  // focus the search box in the panel after render
-  if (state.bookPanelOpen) {
-    setTimeout(() => {
-      const bs = document.getElementById('bookSearch');
-      if (bs) bs.focus();
-    }, 50);
-  }
-}
-
-function selectBook(book) {
-  state.bookFilter = (state.bookFilter === book) ? null : book;
-  state.bookPanelOpen = false;
-  state.bookSearch = '';
-  renderMain();
-}
-
-function clearBookFilter() {
-  state.bookFilter = null;
-  state.bookPanelOpen = false;
-  state.bookSearch = '';
-  renderMain();
-}
-
-function onBookSearch(val) {
-  state.bookSearch = val;
-  const listEl = document.getElementById('bookListContainer');
-  if (!listEl) return;
-  const sheet = DATA.sheets[state.activeSheet];
-  if (!sheet) return;
-  // Re-filter rows same as renderMain would, to get accurate book counts
-  let rows = sheet.rows;
-  if (state.larpOnly && sheet.hasLarp) {
-    rows = rows.filter(r => { const v = r['Larp Version']; return v && String(v).trim().toUpperCase()==='Y'; });
-  }
-  const q = state.search.trim().toLowerCase();
-  if (q) rows = rows.filter(r => Object.values(r).some(v => v && String(v).toLowerCase().includes(q)));
-  listEl.innerHTML = renderBookList(getBooksForSheet(rows));
-}
-
-function renderBookPanel(allBooks) {
-  return `
-    <div class="book-filter-panel">
-      <div class="book-filter-header">
-        <span class="book-filter-label">Filter by Book</span>
-        <input id="bookSearch" class="book-filter-search" type="search"
-          placeholder="Search books…" autocomplete="off"
-          value="${escH(state.bookSearch)}"
-          oninput="onBookSearch(this.value)"
-          onclick="event.stopPropagation()">
-        <button class="book-filter-clear" onclick="toggleBookPanel()" title="Close">✕</button>
-      </div>
-      <div class="book-list" id="bookListContainer">
-        ${renderBookList(allBooks)}
-      </div>
-    </div>`;
-}
-
-function renderBookList(allBooks) {
-  const bq = state.bookSearch.trim().toLowerCase();
-  const filtered = bq ? allBooks.filter(([b]) => b.toLowerCase().includes(bq)) : allBooks;
-  if (!filtered.length) return `<div class="book-filter-none">No books match "${escH(state.bookSearch)}"</div>`;
-  return filtered.map(([book, count]) => {
-    const active = state.bookFilter === book;
-    return `<button class="book-item ${active?'active':''}" onclick="selectBook(${JSON.stringify(book)})">
-      <span class="book-item-name">${hl(book, bq)}</span>
-      <span class="book-item-count">${count}</span>
-    </button>`;
-  }).join('');
-}
-
-
-// ── OWBN LEVELS RENDERER ──
-function renderLevels(levelsJson) {
-  if (!levelsJson) return '';
-  let levels;
-  try { levels = JSON.parse(levelsJson); } catch(e) { return ''; }
-  if (!levels || !levels.length) return '';
-  const dots = ['','•','••','•••','••••','•••••'];
-  let h = '<div class="levels-block">';
-  for (const lv of levels) {
-    const dot = lv.Level <= 5 ? (dots[lv.Level] || String(lv.Level)) : String(lv.Level);
-    h += '<div class="level-entry">' +
-      '<div class="level-header"><span class="level-dot">' + escH(dot) + '</span><span class="level-name">' + escH(lv.Name||'') + '</span></div>' +
-      (lv.Description ? '<div class="level-desc">' + escH(lv.Description) + '</div>' : '') +
-      '</div>';
-  }
-  return h + '</div>';
-}
 // ── RENDER ──
 function renderMain() {
   const main = document.getElementById('main');
   const q = state.search.trim().toLowerCase();
 
-  if (q.length >= 2 && !state.activeSheet) { renderGlobalSearch(q); return; }
-  if (!state.activeSheet) { renderWelcome(); return; }
+  if (!state.activeSheet) {
+    if (q.length >= 2) { renderGlobalSearch(q); return; }
+    renderWelcome(); return;
+  }
 
   const sheet = DATA.sheets[state.activeSheet];
   if (!sheet) return;
@@ -928,30 +677,75 @@ function renderMain() {
   }
   if (q) rows = rows.filter(r => Object.values(r).some(v => v && String(v).toLowerCase().includes(q)));
 
-  // Build book list from pre-filter rows (before applying book filter, so all books always show)
-  const allBooks = getBooksForSheet(rows);
-  const hasBookCol = sheet.columns.includes('Book');
-
-  // Apply book filter
-  if (state.bookFilter && hasBookCol) {
-    rows = rows.filter(r => String(r['Book']||'').trim() === state.bookFilter);
-  }
-
   const cols = sheet.columns;
 
-  // Book filter button label
-  let bookBtnHtml = '';
-  if (hasBookCol) {
-    if (state.bookFilter) {
-      bookBtnHtml = `<button class="active-book-badge" onclick="toggleBookPanel()" title="Change book filter">
-        📖 ${escH(state.bookFilter)}<span class="badge-x" onclick="event.stopPropagation();clearBookFilter()">✕</span>
-      </button>`;
-    } else {
-      bookBtnHtml = `<button class="toggle-btn ${state.bookPanelOpen?'active':''}" onclick="toggleBookPanel()">📖 By Book</button>`;
-    }
+  // Build results HTML separately so we can update without touching the search input
+  const filterHtml = `
+    <div class="filter-row">
+      <span class="filter-label">Filter:</span>
+      ${sheet.hasLarp ? `<button class="toggle-btn ${state.larpOnly?'active':''}" onclick="toggleLarp()">✦ LARP Only</button>` : ''}
+      <button class="toggle-btn" onclick="state.activeSheet=null;buildSidebar();renderMain()">← All</button>
+    </div>`;
+
+  const headerHtml = `
+    <div class="content-header">
+      <div>
+        <div class="content-title">${escH(state.activeSheet)}</div>
+        <div class="content-subtitle">${escH(state.activeGameline)}</div>
+      </div>
+      <div class="result-count">${rows.length.toLocaleString()} entries</div>
+    </div>`;
+
+  let resultsHtml;
+  if (rows.length === 0) {
+    resultsHtml = `<div class="empty-state"><div class="empty-icon">⊘</div><h3>No Results Found</h3><p>Try adjusting your search.</p></div>`;
+  } else if (isMobile()) {
+    resultsHtml = renderCards(rows, cols, q);
+  } else {
+    resultsHtml = renderTable(rows, cols, q, null);
   }
 
-  let html = `
+  // If the search input already exists in the DOM, update everything AROUND it
+  // to avoid destroying it (which dismisses the mobile keyboard).
+  const existingInput = document.getElementById('searchInput');
+  if (existingInput) {
+    // Update filter row
+    let filterEl = main.querySelector('.filter-row');
+    if (!filterEl) {
+      const searchBar = main.querySelector('.search-bar');
+      if (searchBar) {
+        const div = document.createElement('div');
+        div.innerHTML = filterHtml;
+        searchBar.appendChild(div.firstElementChild);
+      }
+    } else {
+      const tmp = document.createElement('div');
+      tmp.innerHTML = filterHtml;
+      filterEl.replaceWith(tmp.firstElementChild);
+    }
+    // Update content header
+    const existingHeader = main.querySelector('.content-header');
+    const tmpH = document.createElement('div');
+    tmpH.innerHTML = headerHtml;
+    if (existingHeader) {
+      existingHeader.replaceWith(tmpH.firstElementChild);
+    } else {
+      main.querySelector('.search-bar').insertAdjacentHTML('afterend', headerHtml);
+    }
+    // Replace results (everything after the content-header)
+    const header = main.querySelector('.content-header');
+    // Remove everything after the header
+    while (header && header.nextSibling) {
+      main.removeChild(header.nextSibling);
+    }
+    const tmpR = document.createElement('div');
+    tmpR.innerHTML = resultsHtml;
+    while (tmpR.firstChild) main.appendChild(tmpR.firstChild);
+    return;
+  }
+
+  // First render — build the full HTML including the search input
+  main.innerHTML = `
     <div class="search-bar">
       <div class="search-wrap">
         <span class="search-icon">⌕</span>
@@ -959,32 +753,10 @@ function renderMain() {
           placeholder="Search ${escH(state.activeSheet)}…"
           value="${escH(state.search)}" oninput="onSearch(this.value)">
       </div>
-      <div class="filter-row">
-        <span class="filter-label">Filter:</span>
-        ${sheet.hasLarp ? `<button class="toggle-btn ${state.larpOnly?'active':''}" onclick="toggleLarp()">✦ LARP Only</button>` : ''}
-        ${bookBtnHtml}
-        <button class="toggle-btn" onclick="state.activeSheet=null;state.bookFilter=null;state.bookPanelOpen=false;buildSidebar();renderMain()">← All</button>
-      </div>
-      ${state.bookPanelOpen && hasBookCol ? renderBookPanel(allBooks) : ''}
+      ${filterHtml}
     </div>
-    <div class="content-header">
-      <div>
-        <div class="content-title">${escH(state.activeSheet)}</div>
-        <div class="content-subtitle">${escH(state.activeGameline)}${state.bookFilter ? ` · ${escH(state.bookFilter)}` : ''}</div>
-      </div>
-      <div class="result-count">${rows.length.toLocaleString()} entries</div>
-    </div>`;
-
-  if (rows.length === 0) {
-    html += `<div class="empty-state"><div class="empty-icon">⊘</div><h3>No Results Found</h3><p>Try adjusting your search or filters.</p></div>`;
-  } else if (isMobile()) {
-    html += renderCards(rows, cols, q);
-  } else {
-    html += renderTable(rows, cols, q, null);
-  }
-
-  main.innerHTML = html;
-  refocusSearch();
+    ${headerHtml}
+    ${resultsHtml}`;
 }
 
 function renderWelcome() {
@@ -1084,9 +856,7 @@ function renderTable(rows, cols, q, maxH) {
     h += `<tr>`;
     for (let i=0; i<dcols.length; i++) {
       const col = dcols[i]; const val = row[col]; const d = val==null?'':String(val);
-      if (col === 'Levels') {
-        h += `<td>${renderLevels(d)}</td>`;
-      } else if (col==='Larp Version') {
+      if (col==='Larp Version') {
         h += `<td>${d.trim().toUpperCase()==='Y'?'<span class="larp-badge">LARP</span>':''}</td>`;
       } else if (i===0) {
         h += `<td class="primary-col">${hl(d,q)}</td>`;
@@ -1109,8 +879,7 @@ function renderCards(rows, cols, q) {
   const bookCol = cols.find(c => c==='Book');
   const pageCol = cols.find(c => c==='Page'||c==='Page Number'||c==='Page.1');
   const larpCol = cols.find(c => c==='Larp Version');
-  const levelsCol = cols.find(c => c==='Levels');
-  const extraCols = cols.filter(c => c!==nameCol && c!==bookCol && c!==pageCol && c!==larpCol && c!=='Page.1' && c!=='Levels' && c!=='Description');
+  const extraCols = cols.filter(c => c!==nameCol && c!==bookCol && c!==pageCol && c!==larpCol && c!=='Page.1');
 
   let h = `<div class="card-list">`;
   for (const row of rows) {
@@ -1136,10 +905,6 @@ function renderCards(rows, cols, q) {
         h += `<span class="entry-tag">${escH(c)}: ${hl(String(row[c]),q)}</span>`;
       }
       h += `</div>`;
-    }
-    // Show levels if present (OWBN paths)
-    if (levelsCol && row[levelsCol]) {
-      h += renderLevels(row[levelsCol]);
     }
     h += `</div>`;
   }
@@ -1171,9 +936,10 @@ function onSearch(val) {
   state.search = val;
   clearTimeout(searchTimeout);
   searchTimeout = setTimeout(() => {
-    if (!state.activeSheet || val.length >= 2) { state.activeSheet = null; buildSidebar(); }
+    // Only switch to global search view when NOT inside a sheet.
+    // Never clear activeSheet here — that destroyed the input on mobile.
     renderMain();
-  }, 250);
+  }, 200);
 }
 
 function toggleLarp() { state.larpOnly = !state.larpOnly; renderMain(); }
