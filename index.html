@@ -442,6 +442,13 @@
   .stat-label { font-size: 11px; color: var(--text-dim); margin-top: 4px; letter-spacing: 0.05em; text-transform: uppercase; }
 
   mark { background: rgba(201,151,58,0.25); color: var(--gold-light); border-radius: 2px; padding: 0 1px; }
+  /* ── OWBN LEVELS ── */
+  .levels-block { margin-top: 10px; display: flex; flex-direction: column; gap: 12px; }
+  .level-entry { border-left: 2px solid var(--border-glow); padding: 4px 0 4px 12px; }
+  .level-header { display: flex; align-items: baseline; gap: 8px; margin-bottom: 3px; }
+  .level-dot { font-family: 'Cinzel', serif; color: var(--gold); font-size: 12px; flex-shrink: 0; letter-spacing: 3px; min-width: 56px; }
+  .level-name { font-family: 'Crimson Text', serif; font-size: 14px; font-weight: 600; color: var(--text-bright); }
+  .level-desc { font-size: 13px; color: var(--text); line-height: 1.5; }
 
   /* ── MOBILE OVERLAY ── */
   #drawerOverlay {
@@ -450,7 +457,7 @@
     inset: 0;
     background: rgba(0,0,0,0.6);
     z-index: 90;
-    pointer-events: none;  /* never intercept taps — sidebar handles its own close */
+    pointer-events: none;
   }
   #drawerOverlay.open { display: block; }
 
@@ -497,7 +504,7 @@
       transform: translateX(0);
     }
 
-    #drawerOverlay-REMOVED { display: block; }
+    /* overlay .open handled above */
 
     main { padding: 12px; gap: 12px; }
 
@@ -541,16 +548,20 @@
 <div class="app">
   <aside id="sidebar"></aside>
   <main id="main">
-    <div class="search-bar" id="searchBar" style="display:none">
-      <div class="search-wrap">
-        <span class="search-icon">⌕</span>
-        <input id="searchInput" type="search" inputmode="search" autocomplete="off"
-               autocorrect="off" autocapitalize="off" spellcheck="false"
-               placeholder="Search…" oninput="onSearch(this.value)">
+    <!-- Persistent search bar — never rebuilt, so iOS keyboard stays up -->
+    <div id="searchWrap" style="display:none">
+      <div class="search-bar">
+        <div class="search-wrap">
+          <span class="search-icon">⌕</span>
+          <input id="searchInput" type="search" inputmode="search"
+                 autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+                 placeholder="Search…" oninput="onSearch(this.value)">
+        </div>
+        <div class="filter-row" id="filterRow"></div>
       </div>
-      <div class="filter-row" id="filterRow"></div>
     </div>
-    <div id="results"></div>
+    <!-- All other content lives here and is freely replaced -->
+    <div id="mainContent"></div>
   </main>
 </div>
 
@@ -561,10 +572,10 @@ let isMobile = () => window.innerWidth <= 700;
 
 let state = {
   activeGameline: null,
-  activeSheet: null,
-  search: '',
-  larpOnly: false,
-  openGamelines: new Set(),
+  activeSheet:    null,
+  search:         '',
+  larpOnly:       false,
+  openGamelines:  new Set(),
 };
 
 const GAMELINE_COLORS = {
@@ -574,10 +585,10 @@ const GAMELINE_COLORS = {
   'Inquisition':'#6a3a1a','Mage: Dark Ages':'#5a4a3a','Demon':'#5a1a5a','Hunter':'#2a4a5a',
 };
 
-// ── DRAWER ──
-// The overlay has pointer-events:none so it NEVER intercepts taps.
-// We close the drawer by listening for taps on the sidebar's own backdrop area
-// (outside the sidebar panel content), and via the ☰ toggle.
+// ── DRAWER ──────────────────────────────────────────────────────────────────
+// The overlay has pointer-events:none so it can NEVER steal a tap from a
+// sidebar button.  We close on outside-tap via a document-level listener
+// registered 50 ms after open (so the opening tap doesn't count as a close).
 function toggleDrawer() {
   const sidebar = document.getElementById('sidebar');
   const overlay = document.getElementById('drawerOverlay');
@@ -585,28 +596,23 @@ function toggleDrawer() {
   sidebar.classList.toggle('open', opening);
   overlay.classList.toggle('open', opening);
   if (opening) {
-    // Close when user taps anywhere outside the sidebar.
-    // We use a one-shot capture listener on document so it fires AFTER
-    // the current tap event fully finishes — avoiding self-closing.
     setTimeout(() => {
-      document.addEventListener('touchstart', outsideTapClose, { capture: true, once: true, passive: true });
-      document.addEventListener('click', outsideTapClose, { capture: true, once: true });
+      document.addEventListener('touchstart', _outsideTap, {capture:true, once:true, passive:true});
+      document.addEventListener('click',      _outsideTap, {capture:true, once:true});
     }, 50);
   }
 }
 
-function outsideTapClose(e) {
+function _outsideTap(e) {
   const sidebar = document.getElementById('sidebar');
   if (!sidebar.contains(e.target)) {
     closeDrawer();
-  } else {
-    // Tap was inside sidebar — re-register so overlay still closes on next outside tap
-    if (document.getElementById('sidebar').classList.contains('open')) {
-      setTimeout(() => {
-        document.addEventListener('touchstart', outsideTapClose, { capture: true, once: true, passive: true });
-        document.addEventListener('click', outsideTapClose, { capture: true, once: true });
-      }, 50);
-    }
+  } else if (sidebar.classList.contains('open')) {
+    // tap was inside — re-arm so next outside tap still closes
+    setTimeout(() => {
+      document.addEventListener('touchstart', _outsideTap, {capture:true, once:true, passive:true});
+      document.addEventListener('click',      _outsideTap, {capture:true, once:true});
+    }, 50);
   }
 }
 
@@ -615,14 +621,14 @@ function closeDrawer() {
   document.getElementById('drawerOverlay').classList.remove('open');
 }
 
-// ── LOAD ──
+// ── LOAD ────────────────────────────────────────────────────────────────────
 async function loadData() {
   try {
     const res = await fetch('data.json');
     DATA = await res.json();
     document.getElementById('loading').classList.add('hidden');
     buildSidebar();
-    renderAll();
+    renderMain();
   } catch(e) {
     document.getElementById('loading').innerHTML =
       `<div class="load-title" style="color:#c0392b">Failed to load data.json</div>
@@ -630,28 +636,29 @@ async function loadData() {
   }
 }
 
-// ── SIDEBAR ──
+// ── SIDEBAR ─────────────────────────────────────────────────────────────────
 function buildSidebar() {
   const sidebar = document.getElementById('sidebar');
   let html = '';
   for (const gl of DATA.gamelines) {
-    const sheets = Object.entries(DATA.sheets).filter(([,s]) => s.gameline === gl);
-    const totalRows = sheets.reduce((a,[,s]) => a + s.rows.length, 0);
-    const color = GAMELINE_COLORS[gl] || '#888';
-    const isOpen = state.openGamelines.has(gl);
+    const sheets   = Object.entries(DATA.sheets).filter(([,s]) => s.gameline === gl);
+    const total    = sheets.reduce((a,[,s]) => a + s.rows.length, 0);
+    const color    = GAMELINE_COLORS[gl] || '#888';
+    const isOpen   = state.openGamelines.has(gl);
     const isActive = state.activeGameline === gl;
 
     html += `<div class="sidebar-section">
-      <button class="gameline-btn ${isActive?'active':''}" onclick="toggleGameline('${escAttr(gl)}')">
+      <button class="gameline-btn ${isActive?'active':''}" onclick="toggleGameline(${JSON.stringify(gl)})">
         <span class="gameline-dot" style="background:${color}"></span>
         ${escH(gl)}
-        <span class="gameline-count">${totalRows.toLocaleString()}</span>
+        <span class="gameline-count">${total.toLocaleString()}</span>
         <span class="chevron ${isOpen?'open':''}">›</span>
       </button>
       <div class="sheet-list ${isOpen?'open':''}">`;
 
     for (const [name, sheet] of sheets) {
-      html += `<button class="sheet-btn ${state.activeSheet===name?'active':''}" onclick="selectSheet('${escAttr(name)}','${escAttr(gl)}')">
+      html += `<button class="sheet-btn ${state.activeSheet===name?'active':''}"
+          onclick="selectSheet(${JSON.stringify(name)},${JSON.stringify(gl)})">
         ${escH(name)}<span class="sheet-row-count">${sheet.rows.length.toLocaleString()}</span>
       </button>`;
     }
@@ -664,66 +671,119 @@ function toggleGameline(gl) {
   if (state.openGamelines.has(gl)) state.openGamelines.delete(gl);
   else state.openGamelines.add(gl);
   state.activeGameline = gl;
-  state.activeSheet = null;
+  state.activeSheet    = null;
   buildSidebar();
-  renderAll();
+  renderMain();
 }
 
 function selectSheet(name, gl) {
-  state.activeSheet = name;
+  state.activeSheet    = name;
   state.activeGameline = gl;
+  state.search         = '';
   state.openGamelines.add(gl);
-  state.search = '';
-  // Update the persistent search input value without rebuilding it
   const inp = document.getElementById('searchInput');
-  if (inp) { inp.value = ''; inp.placeholder = 'Search ' + name + '…'; }
+  if (inp) inp.value = '';
   buildSidebar();
-  renderAll();
+  renderMain();
   const lbl = document.getElementById('activeSheetLabel');
   if (lbl) lbl.textContent = name;
   if (isMobile()) closeDrawer();
 }
 
-// ── RENDER ──
-// Key design: the search input lives permanently in #searchBar and is NEVER
-// rebuilt. Only #results and #filterRow get updated on each render.
-// This prevents iOS from dismissing the keyboard on every keystroke.
+// ── RENDER ───────────────────────────────────────────────────────────────────
+// KEY DESIGN: the <input id="searchInput"> lives permanently in a static
+// wrapper div (#searchWrap) that is NEVER replaced by innerHTML.
+// Only #mainContent is updated on each render — the input is untouched,
+// so iOS never gets a reason to dismiss the keyboard.
 
-function renderAll() {
+function renderMain() {
   const q = state.search.trim().toLowerCase();
-  const searchBar = document.getElementById('searchBar');
-  const filterRow = document.getElementById('filterRow');
-  const results = document.getElementById('results');
 
+  // Determine which view we need
+  let view;
   if (!state.activeSheet) {
-    searchBar.style.display = 'none';
-    if (q.length >= 2) {
-      renderGlobalSearch(q, results);
-    } else {
-      renderWelcome(results);
-    }
-    return;
+    view = (q.length >= 2) ? 'global' : 'welcome';
+  } else {
+    view = 'sheet';
   }
 
-  // Show search bar
-  searchBar.style.display = 'flex';
+  // Show / hide the persistent search bar
+  const searchWrap = document.getElementById('searchWrap');
+  if (view === 'welcome') {
+    searchWrap.style.display = 'none';
+  } else {
+    searchWrap.style.display = '';
+    const inp = document.getElementById('searchInput');
+    // Update placeholder without blurring
+    if (inp && view === 'sheet') inp.placeholder = 'Search ' + state.activeSheet + '\u2026';
+    if (inp && view === 'global') inp.placeholder = 'Search all gamelines\u2026';
+  }
 
+  // Update filter row
+  const filterRow = document.getElementById('filterRow');
+  if (view === 'sheet') {
+    const sheet = DATA.sheets[state.activeSheet];
+    filterRow.innerHTML = `
+      <span class="filter-label">Filter:</span>
+      ${sheet.hasLarp ? `<button class="toggle-btn ${state.larpOnly?'active':''}" onclick="toggleLarp()">\u2726 LARP Only</button>` : ''}
+      <button class="toggle-btn" onclick="goBack()">\u2190 All</button>`;
+  } else if (view === 'global') {
+    filterRow.innerHTML = `
+      <span class="filter-label">Filter:</span>
+      <button class="toggle-btn ${state.larpOnly?'active':''}" onclick="toggleLarp()">\u2726 LARP Only</button>`;
+  } else {
+    filterRow.innerHTML = '';
+  }
+
+  // Render content into #mainContent
+  const mc = document.getElementById('mainContent');
+  if      (view === 'welcome') mc.innerHTML = buildWelcome();
+  else if (view === 'global')  mc.innerHTML = buildGlobalSearch(q);
+  else                         mc.innerHTML = buildSheet(q);
+}
+
+function goBack() {
+  state.activeSheet = null;
+  state.search      = '';
+  const inp = document.getElementById('searchInput');
+  if (inp) { inp.value = ''; inp.placeholder = 'Search all gamelines\u2026'; }
+  buildSidebar();
+  renderMain();
+}
+
+function buildWelcome() {
+  const totalRows   = Object.values(DATA.sheets).reduce((a,s) => a+s.rows.length, 0);
+  const totalSheets = Object.keys(DATA.sheets).length;
+  return `
+    <div class="search-bar" style="padding:0">
+      <div class="search-wrap">
+        <span class="search-icon">\u2315</span>
+        <input type="search" inputmode="search" autocomplete="off" autocorrect="off"
+          placeholder="Search all gamelines\u2026"
+          value="${escH(state.search)}" oninput="onSearch(this.value)"
+          style="width:100%;padding:12px 14px 12px 40px;background:var(--surface);border:1px solid var(--border);border-radius:6px;color:var(--text-bright);font-family:inherit;font-size:16px;outline:none;">
+      </div>
+    </div>
+    <div class="welcome">
+      <div class="welcome-symbol">\u2726</div>
+      <h2>Old World of Darkness \u2014 MET Index</h2>
+      <p>${isMobile() ? 'Tap \u2630 to browse by gameline, or search above.' : 'Select a gameline from the sidebar, or search above.'}</p>
+      <div class="welcome-stats">
+        <div class="stat-box"><span class="stat-num">${totalRows.toLocaleString()}</span><div class="stat-label">Entries</div></div>
+        <div class="stat-box"><span class="stat-num">${totalSheets}</span><div class="stat-label">Categories</div></div>
+        <div class="stat-box"><span class="stat-num">${DATA.gamelines.length}</span><div class="stat-label">Gamelines</div></div>
+        <div class="stat-box"><span class="stat-num">${DATA.books.length}</span><div class="stat-label">Books</div></div>
+      </div>
+    </div>`;
+}
+
+function buildSheet(q) {
   const sheet = DATA.sheets[state.activeSheet];
-  if (!sheet) return;
-
-  // Update filter row (not the input)
-  filterRow.innerHTML = `
-    <span class="filter-label">Filter:</span>
-    ${sheet.hasLarp ? `<button class="toggle-btn ${state.larpOnly?'active':''}" onclick="toggleLarp()">✦ LARP Only</button>` : ''}
-    <button class="toggle-btn" onclick="goBack()">← All</button>`;
-
   let rows = sheet.rows;
-  if (state.larpOnly && sheet.hasLarp) {
+  if (state.larpOnly && sheet.hasLarp)
     rows = rows.filter(r => { const v = r['Larp Version']; return v && String(v).trim().toUpperCase()==='Y'; });
-  }
-  if (q) rows = rows.filter(r => Object.values(r).some(v => v && String(v).toLowerCase().includes(q)));
-
-  const cols = sheet.columns;
+  if (q)
+    rows = rows.filter(r => Object.values(r).some(v => v && String(v).toLowerCase().includes(q)));
 
   let html = `
     <div class="content-header">
@@ -735,88 +795,40 @@ function renderAll() {
     </div>`;
 
   if (rows.length === 0) {
-    html += `<div class="empty-state"><div class="empty-icon">⊘</div><h3>No Results Found</h3><p>Try adjusting your search.</p></div>`;
+    html += `<div class="empty-state"><div class="empty-icon">\u2298</div><h3>No Results Found</h3><p>Try adjusting your search.</p></div>`;
   } else if (isMobile()) {
-    html += renderCards(rows, cols, q);
+    html += renderCards(rows, sheet.columns, q);
   } else {
-    html += renderTable(rows, cols, q, null);
+    html += renderTable(rows, sheet.columns, q, null);
   }
-
-  results.innerHTML = html;
+  return html;
 }
 
-function goBack() {
-  state.activeSheet = null;
-  state.search = '';
-  const inp = document.getElementById('searchInput');
-  if (inp) { inp.value = ''; inp.placeholder = 'Search all gamelines…'; }
-  buildSidebar();
-  renderAll();
-}
-
-function renderWelcome(container) {
-  const totalRows = Object.values(DATA.sheets).reduce((a,s) => a+s.rows.length, 0);
-  const totalSheets = Object.keys(DATA.sheets).length;
-  container.innerHTML = `
-    <div class="search-bar" style="margin-bottom:0">
-      <div class="search-wrap">
-        <span class="search-icon">⌕</span>
-        <input id="searchInputWelcome" type="search" inputmode="search" autocomplete="off"
-          placeholder="Search all gamelines…"
-          value="${escH(state.search)}" oninput="onSearch(this.value)">
-      </div>
-    </div>
-    <div class="welcome">
-      <div class="welcome-symbol">✦</div>
-      <h2>Old World of Darkness — MET Index</h2>
-      <p>${isMobile() ? 'Tap ☰ to browse by gameline, or search above.' : 'Select a gameline from the sidebar, or search above.'}</p>
-      <div class="welcome-stats">
-        <div class="stat-box"><span class="stat-num">${totalRows.toLocaleString()}</span><div class="stat-label">Entries</div></div>
-        <div class="stat-box"><span class="stat-num">${totalSheets}</span><div class="stat-label">Categories</div></div>
-        <div class="stat-box"><span class="stat-num">${DATA.gamelines.length}</span><div class="stat-label">Gamelines</div></div>
-        <div class="stat-box"><span class="stat-num">${DATA.books.length}</span><div class="stat-label">Books</div></div>
-      </div>
-    </div>`;
-}
-
-function renderGlobalSearch(q, container) {
+function buildGlobalSearch(q) {
   const results = [];
   for (const [name, sheet] of Object.entries(DATA.sheets)) {
     let rows = sheet.rows.filter(r => Object.values(r).some(v => v && String(v).toLowerCase().includes(q)));
-    if (state.larpOnly && sheet.hasLarp) {
+    if (state.larpOnly && sheet.hasLarp)
       rows = rows.filter(r => { const v = r['Larp Version']; return v && String(v).trim().toUpperCase()==='Y'; });
-    }
     if (rows.length) results.push({ name, sheet, rows });
   }
   const totalHits = results.reduce((a,r) => a+r.rows.length, 0);
 
   let html = `
-    <div class="search-bar" style="margin-bottom:0">
-      <div class="search-wrap">
-        <span class="search-icon">⌕</span>
-        <input id="searchInputGlobal" type="search" inputmode="search" autocomplete="off"
-          placeholder="Search all gamelines…"
-          value="${escH(state.search)}" oninput="onSearch(this.value)">
-      </div>
-      <div class="filter-row">
-        <span class="filter-label">Filter:</span>
-        <button class="toggle-btn ${state.larpOnly?'active':''}" onclick="toggleLarp()">✦ LARP Only</button>
-      </div>
-    </div>
     <div class="content-header">
       <div class="content-title">Search: "${escH(state.search)}"</div>
       <div class="result-count">${totalHits.toLocaleString()} in ${results.length} categories</div>
     </div>`;
 
   if (!results.length) {
-    html += `<div class="empty-state"><div class="empty-icon">⊘</div><h3>No Results Found</h3></div>`;
+    html += `<div class="empty-state"><div class="empty-icon">\u2298</div><h3>No Results Found</h3></div>`;
   } else {
     for (const { name, sheet, rows } of results) {
-      const gl = sheet.gameline;
+      const gl   = sheet.gameline;
       const cols = sheet.columns;
       const shown = rows.slice(0, 50);
       html += `<div class="global-result-group">
-        <div class="global-group-header" onclick="selectSheet('${escAttr(name)}','${escAttr(gl)}')">
+        <div class="global-group-header" onclick="selectSheet(${JSON.stringify(name)},${JSON.stringify(gl)})">
           <span class="gameline-dot" style="background:${GAMELINE_COLORS[gl]||'#888'};width:8px;height:8px;border-radius:50%;display:inline-block"></span>
           <h3>${escH(name)}</h3>
           <span class="gameline-tag">${escH(gl)}</span>
@@ -826,110 +838,158 @@ function renderGlobalSearch(q, container) {
       html += `</div>`;
     }
   }
-  container.innerHTML = html;
+  return html;
 }
 
-// ── TABLE (desktop) ──
+// ── OWBN LEVELS RENDERER ────────────────────────────────────────────────────
+const DOTS = ['','\u2022','\u2022\u2022','\u2022\u2022\u2022','\u2022\u2022\u2022\u2022','\u2022\u2022\u2022\u2022\u2022'];
+
+function renderLevels(levelsJson) {
+  if (!levelsJson) return '';
+  let levels;
+  try { levels = JSON.parse(levelsJson); } catch(e) { return ''; }
+  if (!levels || !levels.length) return '';
+  let h = '<div class="levels-block">';
+  for (const lv of levels) {
+    const dot = (lv.Level >= 1 && lv.Level <= 5) ? DOTS[lv.Level] : String(lv.Level);
+    h += `<div class="level-entry">
+      <div class="level-header">
+        <span class="level-dot">${escH(dot)}</span>
+        <span class="level-name">${escH(lv.Name || '')}</span>
+      </div>
+      ${lv.Description ? `<div class="level-desc">${escH(lv.Description)}</div>` : ''}
+    </div>`;
+  }
+  return h + '</div>';
+}
+
+// ── TABLE (desktop) ──────────────────────────────────────────────────────────
 function renderTable(rows, cols, q, maxH) {
+  // For OWBN paths, hide the Levels column from the table header
+  // and instead show it expanded below each row.
+  const hasLevels = cols.includes('Levels');
+  const dcols = (maxH ? cols.slice(0,5) : cols).filter(c => c !== 'Levels');
+
   const style = maxH ? `style="max-height:${maxH}px"` : '';
   let h = `<div class="table-wrap" ${style}><table><thead><tr>`;
-  const dcols = maxH ? cols.slice(0,5) : cols;
   for (const c of dcols) h += `<th>${escH(c)}</th>`;
   h += `</tr></thead><tbody>`;
+
   for (const row of rows) {
     h += `<tr>`;
-    for (let i=0; i<dcols.length; i++) {
-      const col = dcols[i]; const val = row[col]; const d = val==null?'':String(val);
-      if (col==='Larp Version') {
-        h += `<td>${d.trim().toUpperCase()==='Y'?'<span class="larp-badge">LARP</span>':''}</td>`;
-      } else if (i===0) {
-        h += `<td class="primary-col">${hl(d,q)}</td>`;
-      } else if (col==='Page'||col==='Page Number'||col==='Page.1') {
+    for (let i = 0; i < dcols.length; i++) {
+      const col = dcols[i];
+      const val = row[col];
+      const d   = val == null ? '' : String(val);
+      if (col === 'Larp Version') {
+        h += `<td>${d.trim().toUpperCase()==='Y' ? '<span class="larp-badge">LARP</span>' : ''}</td>`;
+      } else if (i === 0) {
+        h += `<td class="primary-col">${hl(d, q)}</td>`;
+      } else if (col === 'Page' || col === 'Page Number' || col === 'Page.1') {
         h += `<td class="page-col">${escH(d)}</td>`;
-      } else if (col==='Book') {
-        h += `<td class="book-col">${hl(d,q)}</td>`;
+      } else if (col === 'Book') {
+        h += `<td class="book-col">${hl(d, q)}</td>`;
       } else {
-        h += `<td>${hl(d,q)}</td>`;
+        h += `<td>${hl(d, q)}</td>`;
       }
     }
     h += `</tr>`;
+
+    // If this sheet has levels, add an expansion row beneath each entry
+    if (hasLevels && row['Levels']) {
+      const levelsHtml = renderLevels(row['Levels']);
+      if (levelsHtml) {
+        h += `<tr class="levels-row"><td colspan="${dcols.length}" style="padding:0 12px 12px 24px;border-bottom:1px solid var(--border)">${levelsHtml}</td></tr>`;
+      }
+    }
   }
   return h + `</tbody></table></div>`;
 }
 
-// ── CARDS (mobile) ──
+// ── CARDS (mobile) ───────────────────────────────────────────────────────────
 function renderCards(rows, cols, q) {
-  const nameCol = cols[0];
-  const bookCol = cols.find(c => c==='Book');
-  const pageCol = cols.find(c => c==='Page'||c==='Page Number'||c==='Page.1');
-  const larpCol = cols.find(c => c==='Larp Version');
-  const extraCols = cols.filter(c => c!==nameCol && c!==bookCol && c!==pageCol && c!==larpCol && c!=='Page.1');
+  const nameCol  = cols[0];
+  const bookCol  = cols.find(c => c === 'Book');
+  const pageCol  = cols.find(c => c === 'Page' || c === 'Page Number' || c === 'Page.1');
+  const larpCol  = cols.find(c => c === 'Larp Version');
+  const levelsCol = cols.find(c => c === 'Levels');
+  const descCol  = cols.find(c => c === 'Description');
+  const extraCols = cols.filter(c =>
+    c !== nameCol && c !== bookCol && c !== pageCol &&
+    c !== larpCol && c !== 'Page.1' && c !== 'Levels' && c !== 'Description'
+  );
 
   let h = `<div class="card-list">`;
   for (const row of rows) {
-    const name = row[nameCol]==null?'':String(row[nameCol]);
-    const book = bookCol && row[bookCol] ? String(row[bookCol]) : '';
-    const page = pageCol && row[pageCol] ? String(row[pageCol]) : '';
-    const isLarp = larpCol && String(row[larpCol]||'').trim().toUpperCase()==='Y';
+    const name   = row[nameCol] == null ? '' : String(row[nameCol]);
+    const book   = bookCol  && row[bookCol]  ? String(row[bookCol])  : '';
+    const page   = pageCol  && row[pageCol]  ? String(row[pageCol])  : '';
+    const isLarp = larpCol  && String(row[larpCol] || '').trim().toUpperCase() === 'Y';
 
     h += `<div class="entry-card">
-      <div class="entry-card-name">${hl(name,q)}${isLarp?' <span class="larp-badge">LARP</span>':''}</div>`;
+      <div class="entry-card-name">${hl(name, q)}${isLarp ? ' <span class="larp-badge">LARP</span>' : ''}</div>`;
 
     if (book || page) {
       h += `<div class="entry-card-meta">`;
-      if (book) h += `<span class="entry-card-book">${hl(book,q)}</span>`;
+      if (book) h += `<span class="entry-card-book">${hl(book, q)}</span>`;
       if (page) h += `<span class="entry-card-page">p.${escH(page)}</span>`;
       h += `</div>`;
     }
 
-    const extras = extraCols.filter(c => row[c]!=null && String(row[c]).trim()!=='');
+    // Description (OWBN paths)
+    if (descCol && row[descCol]) {
+      h += `<div class="level-desc" style="margin-top:6px">${escH(String(row[descCol]))}</div>`;
+    }
+
+    const extras = extraCols.filter(c => row[c] != null && String(row[c]).trim() !== '');
     if (extras.length) {
       h += `<div class="entry-card-extras">`;
-      for (const c of extras.slice(0,4)) {
-        h += `<span class="entry-tag">${escH(c)}: ${hl(String(row[c]),q)}</span>`;
+      for (const c of extras.slice(0, 4)) {
+        h += `<span class="entry-tag">${escH(c)}: ${hl(String(row[c]), q)}</span>`;
       }
       h += `</div>`;
     }
+
+    // Levels (OWBN paths)
+    if (levelsCol && row[levelsCol]) {
+      h += renderLevels(row[levelsCol]);
+    }
+
     h += `</div>`;
   }
   return h + `</div>`;
 }
 
-// ── HELPERS ──
+// ── HELPERS ──────────────────────────────────────────────────────────────────
 function hl(text, q) {
-  if (!q||!text) return escH(text);
-  const safe = escH(text);
-  const safeQ = escH(q).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-  return safe.replace(new RegExp(`(${safeQ})`,'gi'),'<mark>$1</mark>');
+  if (!q || !text) return escH(text);
+  const safe  = escH(text);
+  const safeQ = escH(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return safe.replace(new RegExp(`(${safeQ})`, 'gi'), '<mark>$1</mark>');
 }
 
 function escH(str) {
-  if (str==null) return '';
-  return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
-function escAttr(str) {
-  if (str==null) return '';
-  return String(str).replace(/'/g,"\\'");
-}
-
-let searchTimeout;
+let _searchTimer;
 function onSearch(val) {
   state.search = val;
-  // Sync value to whichever input is active
-  ['searchInput','searchInputWelcome','searchInputGlobal'].forEach(id => {
-    const el = document.getElementById(id);
-    if (el && el !== document.activeElement) el.value = val;
-  });
-  clearTimeout(searchTimeout);
-  searchTimeout = setTimeout(() => { renderAll(); }, 250);
+  // Keep the persistent input in sync if it exists
+  const pi = document.getElementById('searchInput');
+  if (pi && pi !== document.activeElement) pi.value = val;
+  clearTimeout(_searchTimer);
+  _searchTimer = setTimeout(renderMain, 220);
 }
 
-function toggleLarp() { state.larpOnly = !state.larpOnly; renderAll(); }
+function toggleLarp() { state.larpOnly = !state.larpOnly; renderMain(); }
 
 window.addEventListener('resize', () => {
   if (!isMobile()) closeDrawer();
-  renderAll();
+  renderMain();
 });
 
 loadData();
