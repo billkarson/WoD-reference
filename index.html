@@ -115,24 +115,20 @@
     position: fixed;
     top: var(--header-h);
     bottom: 0;
-    left: 260px; right: 0;
+    left: 0; right: 0;
+    display: grid;
+    grid-template-columns: 260px 1fr;
     z-index: 1;
   }
 
   /* ── SIDEBAR ── */
   aside {
-    position: fixed;
-    top: var(--header-h);
-    bottom: 0;
-    left: 0;
-    width: 260px;
     border-right: 1px solid var(--border);
     background: var(--surface);
     padding: 16px 0;
     overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: var(--border-glow) transparent;
-    z-index: 95;
   }
 
   aside::-webkit-scrollbar { width: 4px; }
@@ -215,7 +211,6 @@
   /* ── MAIN ── */
   main {
     overflow-y: auto;
-    height: 100%;
     padding: 16px;
     display: flex;
     flex-direction: column;
@@ -228,7 +223,7 @@
   main::-webkit-scrollbar-thumb { background: var(--border-glow); border-radius: 2px; }
 
   /* ── SEARCH BAR ── */
-  #searchContainer { display: flex; flex-direction: column; gap: 8px; }
+  .search-bar { display: flex; flex-direction: column; gap: 8px; }
 
   .search-wrap { position: relative; }
 
@@ -240,7 +235,7 @@
 
   #searchInput {
     width: 100%;
-    padding: 12px 36px 12px 40px;
+    padding: 12px 14px 12px 40px;
     background: var(--surface);
     border: 1px solid var(--border);
     border-radius: 6px;
@@ -251,23 +246,6 @@
     transition: border-color 0.2s;
     -webkit-appearance: none;
   }
-
-  #clearSearch {
-    position: absolute; right: 10px; top: 50%;
-    transform: translateY(-50%);
-    background: none;
-    border: none;
-    color: var(--text-dim);
-    font-size: 18px;
-    line-height: 1;
-    cursor: pointer;
-    padding: 4px 6px;
-    border-radius: 4px;
-    display: none;
-    -webkit-appearance: none;
-  }
-  #clearSearch:hover { color: var(--text-bright); }
-  #clearSearch.visible { display: block; }
 
   #searchInput:focus { border-color: var(--gold-dim); }
   #searchInput::placeholder { color: var(--text-dim); }
@@ -501,10 +479,13 @@
 
     #menuBtn { display: flex; align-items: center; justify-content: center; }
 
-    .app { left: 0; }
+    .app { grid-template-columns: 1fr; }
 
     aside {
+      position: fixed;
+      top: var(--header-h); bottom: 0; left: 0;
       width: 280px;
+      z-index: 95;
       transform: translateX(-100%);
       transition: transform 0.25s ease;
       padding-bottom: 32px;
@@ -543,7 +524,6 @@
   <div style="font-size:13px;color:var(--text-dim)">Loading chronicles…</div>
 </div>
 
-<aside id="sidebar"></aside>
 <div id="drawerOverlay" onclick="closeDrawer()"></div>
 
 <header>
@@ -557,12 +537,8 @@
 </header>
 
 <div class="app">
-  <main id="main">
-    <!-- Search bar lives here permanently — never destroyed while typing -->
-    <div id="searchContainer"></div>
-    <!-- Only this area is swapped out on each search/navigation -->
-    <div id="resultsContainer"></div>
-  </main>
+  <aside id="sidebar"></aside>
+  <main id="main"></main>
 </div>
 
 <script>
@@ -582,7 +558,7 @@ const GAMELINE_COLORS = {
   'General':'#888','Vampire':'#8b1a1a','Kuei-jin':'#a0522d',
   'Mortals':'#4a6a8a','Changeling':'#6a4a8a','Mage':'#1a4a6a',
   'Werewolf':'#3a5a2a','Wraith':'#4a4a4a','Mummy':'#7a6a2a',
-  'Inquisition':'#6a3a1a','Dark Ages':'#5a4a3a','Demon':'#5a1a5a','Hunter':'#2a4a5a',
+  'Inquisition':'#6a3a1a','Mage: Dark Ages':'#5a4a3a','Demon':'#5a1a5a','Hunter':'#2a4a5a',
 };
 
 // ── DRAWER ──
@@ -606,8 +582,7 @@ async function loadData() {
     DATA = await res.json();
     document.getElementById('loading').classList.add('hidden');
     buildSidebar();
-    renderSearchBar();
-    renderResults();
+    renderMain();
   } catch(e) {
     document.getElementById('loading').innerHTML =
       `<div class="load-title" style="color:#c0392b">Failed to load data.json</div>
@@ -651,8 +626,7 @@ function toggleGameline(gl) {
   state.activeGameline = gl;
   state.activeSheet = null;
   buildSidebar();
-  renderSearchBar();
-  renderResults();
+  renderMain();
 }
 
 function selectSheet(name, gl) {
@@ -660,57 +634,23 @@ function selectSheet(name, gl) {
   state.activeGameline = gl;
   state.openGamelines.add(gl);
   state.search = '';
+  const inp = document.getElementById('searchInput');
+  if (inp) inp.value = '';
   buildSidebar();
-  renderSearchBar();   // re-render search bar to update placeholder & filters
-  renderResults();
+  renderMain();
   // update mobile header label
   const lbl = document.getElementById('activeSheetLabel');
   if (lbl) lbl.textContent = name;
   if (isMobile()) closeDrawer();
 }
 
-// ── SEARCH BAR (persistent — rendered on sheet/context change, NOT on every keystroke) ──
-function renderSearchBar() {
-  const sc = document.getElementById('searchContainer');
-  if (!DATA) return;
-
-  const placeholder = state.activeSheet
-    ? `Search ${escH(state.activeSheet)}…`
-    : 'Search all gamelines…';
-
-  const sheet = state.activeSheet ? DATA.sheets[state.activeSheet] : null;
-  const showLarp = sheet && sheet.hasLarp;
-  const showBack = !!state.activeSheet;
-
-  let filterHtml = '';
-  if (showLarp || showBack) {
-    filterHtml = `<div class="filter-row">
-      <span class="filter-label">Filter:</span>
-      ${showLarp ? `<button class="toggle-btn ${state.larpOnly?'active':''}" id="larpBtn" onclick="toggleLarp()">✦ LARP Only</button>` : ''}
-      ${showBack ? `<button class="toggle-btn" onclick="goAll()">← All</button>` : ''}
-    </div>`;
-  }
-
-  sc.innerHTML = `
-    <div class="search-wrap">
-      <span class="search-icon">⌕</span>
-      <input id="searchInput" type="search" inputmode="search" autocomplete="off" autocorrect="off"
-        placeholder="${placeholder}"
-        value="${escH(state.search)}" oninput="onSearch(this.value)">
-      <button id="clearSearch" class="${state.search ? 'visible' : ''}" onclick="clearSearch()" aria-label="Clear search">✕</button>
-    </div>
-    ${filterHtml}`;
-}
-
-// ── RESULTS ONLY ── (called on every search keystroke — does NOT touch #searchInput)
-function renderResults() {
-  const rc = document.getElementById('resultsContainer');
-  if (!DATA) return;
-
+// ── RENDER ──
+function renderMain() {
+  const main = document.getElementById('main');
   const q = state.search.trim().toLowerCase();
 
-  if (q.length >= 2 && !state.activeSheet) { renderGlobalSearchResults(q, rc); return; }
-  if (!state.activeSheet) { renderWelcomeResults(rc); return; }
+  if (q.length >= 2 && !state.activeSheet) { renderGlobalSearch(q); return; }
+  if (!state.activeSheet) { renderWelcome(); return; }
 
   const sheet = DATA.sheets[state.activeSheet];
   if (!sheet) return;
@@ -724,6 +664,19 @@ function renderResults() {
   const cols = sheet.columns;
 
   let html = `
+    <div class="search-bar">
+      <div class="search-wrap">
+        <span class="search-icon">⌕</span>
+        <input id="searchInput" type="search" inputmode="search" autocomplete="off" autocorrect="off"
+          placeholder="Search ${escH(state.activeSheet)}…"
+          value="${escH(state.search)}" oninput="onSearch(this.value)">
+      </div>
+      <div class="filter-row">
+        <span class="filter-label">Filter:</span>
+        ${sheet.hasLarp ? `<button class="toggle-btn ${state.larpOnly?'active':''}" onclick="toggleLarp()">✦ LARP Only</button>` : ''}
+        <button class="toggle-btn" onclick="state.activeSheet=null;buildSidebar();renderMain()">← All</button>
+      </div>
+    </div>
     <div class="content-header">
       <div>
         <div class="content-title">${escH(state.activeSheet)}</div>
@@ -740,14 +693,24 @@ function renderResults() {
     html += renderTable(rows, cols, q, null);
   }
 
-  rc.innerHTML = html;
+  main.innerHTML = html;
+  refocusSearch();
 }
 
-function renderWelcomeResults(rc) {
+function renderWelcome() {
+  const main = document.getElementById('main');
   const totalRows = Object.values(DATA.sheets).reduce((a,s) => a+s.rows.length, 0);
   const totalSheets = Object.keys(DATA.sheets).length;
 
-  rc.innerHTML = `
+  main.innerHTML = `
+    <div class="search-bar">
+      <div class="search-wrap">
+        <span class="search-icon">⌕</span>
+        <input id="searchInput" type="search" inputmode="search" autocomplete="off"
+          placeholder="Search all gamelines…"
+          value="${escH(state.search)}" oninput="onSearch(this.value)">
+      </div>
+    </div>
     <div class="welcome">
       <div class="welcome-symbol">✦</div>
       <h2>Old World of Darkness — MET Index</h2>
@@ -761,7 +724,8 @@ function renderWelcomeResults(rc) {
     </div>`;
 }
 
-function renderGlobalSearchResults(q, rc) {
+function renderGlobalSearch(q) {
+  const main = document.getElementById('main');
   const results = [];
 
   for (const [name, sheet] of Object.entries(DATA.sheets)) {
@@ -774,11 +738,19 @@ function renderGlobalSearchResults(q, rc) {
 
   const totalHits = results.reduce((a,r) => a+r.rows.length, 0);
 
-  // Update larp button state without touching the input
-  const larpBtn = document.getElementById('larpBtn');
-  if (larpBtn) larpBtn.className = `toggle-btn ${state.larpOnly?'active':''}`;
-
   let html = `
+    <div class="search-bar">
+      <div class="search-wrap">
+        <span class="search-icon">⌕</span>
+        <input id="searchInput" type="search" inputmode="search" autocomplete="off"
+          placeholder="Search all gamelines…"
+          value="${escH(state.search)}" oninput="onSearch(this.value)">
+      </div>
+      <div class="filter-row">
+        <span class="filter-label">Filter:</span>
+        <button class="toggle-btn ${state.larpOnly?'active':''}" onclick="toggleLarp()">✦ LARP Only</button>
+      </div>
+    </div>
     <div class="content-header">
       <div class="content-title">Search: "${escH(state.search)}"</div>
       <div class="result-count">${totalHits.toLocaleString()} in ${results.length} categories</div>
@@ -807,7 +779,8 @@ function renderGlobalSearchResults(q, rc) {
     }
   }
 
-  rc.innerHTML = html;
+  main.innerHTML = html;
+  refocusSearch();
 }
 
 // ── TABLE (desktop) ──
@@ -889,49 +862,28 @@ function escH(str) {
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-function goAll() {
-  state.activeSheet = null;
-  buildSidebar();
-  renderSearchBar();
-  renderResults();
-}
-
-function clearSearch() {
-  state.search = '';
-  const inp = document.getElementById('searchInput');
-  if (inp) { inp.value = ''; inp.focus(); }
-  const btn = document.getElementById('clearSearch');
-  if (btn) btn.classList.remove('visible');
-  buildSidebar();
-  renderResults();
+function refocusSearch() {
+  if (state.search) {
+    const inp = document.getElementById('searchInput');
+    if (inp && !isMobile()) { inp.focus(); inp.setSelectionRange(inp.value.length, inp.value.length); }
+  }
 }
 
 let searchTimeout;
 function onSearch(val) {
   state.search = val;
-  // Show/hide clear button without touching the input element
-  const btn = document.getElementById('clearSearch');
-  if (btn) btn.classList.toggle('visible', val.length > 0);
   clearTimeout(searchTimeout);
   searchTimeout = setTimeout(() => {
-    // When typing clears a sheet context in global search mode, update sidebar
     if (!state.activeSheet || val.length >= 2) { state.activeSheet = null; buildSidebar(); }
-    // Only update results — NEVER touch #searchInput — keyboard stays open
-    renderResults();
+    renderMain();
   }, 250);
 }
 
-function toggleLarp() {
-  state.larpOnly = !state.larpOnly;
-  // Update larp button appearance without re-rendering the search bar
-  const btn = document.getElementById('larpBtn');
-  if (btn) btn.className = `toggle-btn ${state.larpOnly?'active':''}`;
-  renderResults();
-}
+function toggleLarp() { state.larpOnly = !state.larpOnly; renderMain(); }
 
 window.addEventListener('resize', () => {
   if (!isMobile()) closeDrawer();
-  if (state.activeSheet || state.search) renderResults();
+  if (state.activeSheet || state.search) renderMain();
 });
 
 loadData();
