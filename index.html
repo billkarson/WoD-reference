@@ -443,6 +443,140 @@
 
   mark { background: rgba(201,151,58,0.25); color: var(--gold-light); border-radius: 2px; padding: 0 1px; }
 
+  /* ── BOOK FILTER PANEL ── */
+  .book-filter-panel {
+    background: var(--surface);
+    border: 1px solid var(--border-glow);
+    border-radius: 6px;
+    overflow: hidden;
+    animation: slideDown 0.15s ease;
+  }
+
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-6px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .book-filter-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface2);
+  }
+
+  .book-filter-search {
+    flex: 1;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 5px 10px;
+    color: var(--text-bright);
+    font-family: 'Crimson Text', serif;
+    font-size: 14px;
+    outline: none;
+    min-width: 0;
+  }
+  .book-filter-search:focus { border-color: var(--gold-dim); }
+  .book-filter-search::placeholder { color: var(--text-dim); }
+
+  .book-filter-clear {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 3px;
+    line-height: 1;
+    flex-shrink: 0;
+  }
+  .book-filter-clear:hover { color: var(--text-bright); background: rgba(255,255,255,0.05); }
+
+  .book-filter-label {
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    white-space: nowrap;
+    flex-shrink: 0;
+  }
+
+  .book-list {
+    max-height: 220px;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-glow) transparent;
+  }
+  .book-list::-webkit-scrollbar { width: 4px; }
+  .book-list::-webkit-scrollbar-thumb { background: var(--border-glow); border-radius: 2px; }
+
+  .book-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 8px 14px;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-dim);
+    font-family: 'Crimson Text', serif;
+    font-size: 14px;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.12s;
+    min-height: 38px;
+  }
+  .book-item:last-child { border-bottom: none; }
+  .book-item:hover, .book-item:active { color: var(--text-bright); background: rgba(201,151,58,0.05); }
+  .book-item.active { color: var(--gold-light); background: rgba(201,151,58,0.1); }
+  .book-item.active::before {
+    content: '✦';
+    font-size: 9px;
+    color: var(--gold);
+    flex-shrink: 0;
+  }
+
+  .book-item-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .book-item-count {
+    font-family: 'Cinzel', serif;
+    font-size: 10px;
+    color: var(--text-dim);
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 1px 6px;
+    border-radius: 8px;
+    flex-shrink: 0;
+  }
+  .book-item.active .book-item-count { border-color: var(--gold-dim); color: var(--gold-dim); }
+
+  .book-filter-none { padding: 14px; text-align: center; color: var(--text-dim); font-size: 13px; font-style: italic; }
+
+  /* active book badge shown in filter row */
+  .active-book-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(201,151,58,0.12);
+    border: 1px solid var(--gold-dim);
+    border-radius: 4px;
+    padding: 4px 10px 4px 10px;
+    font-family: 'Crimson Text', serif;
+    font-size: 13px;
+    color: var(--gold-light);
+    cursor: pointer;
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    transition: background 0.12s;
+  }
+  .active-book-badge:hover { background: rgba(201,151,58,0.2); }
+  .active-book-badge .badge-x { font-size: 15px; color: var(--gold-dim); flex-shrink: 0; margin-left: 2px; }
+
   /* ── MOBILE OVERLAY ── */
   #drawerOverlay {
     display: none;
@@ -551,6 +685,9 @@ let state = {
   activeSheet: null,
   search: '',
   larpOnly: false,
+  bookFilter: null,      // currently selected book string, or null
+  bookPanelOpen: false,  // whether the book picker panel is visible
+  bookSearch: '',        // search within the book list
   openGamelines: new Set(),
 };
 
@@ -634,6 +771,9 @@ function selectSheet(name, gl) {
   state.activeGameline = gl;
   state.openGamelines.add(gl);
   state.search = '';
+  state.bookFilter = null;
+  state.bookPanelOpen = false;
+  state.bookSearch = '';
   const inp = document.getElementById('searchInput');
   if (inp) inp.value = '';
   buildSidebar();
@@ -642,6 +782,92 @@ function selectSheet(name, gl) {
   const lbl = document.getElementById('activeSheetLabel');
   if (lbl) lbl.textContent = name;
   if (isMobile()) closeDrawer();
+}
+
+// ── BOOK FILTER HELPERS ──
+function getBooksForSheet(rows) {
+  const counts = {};
+  for (const row of rows) {
+    const b = row['Book'];
+    if (b && String(b).trim()) {
+      const k = String(b).trim();
+      counts[k] = (counts[k] || 0) + 1;
+    }
+  }
+  return Object.entries(counts).sort((a, b) => a[0].localeCompare(b[0]));
+}
+
+function toggleBookPanel() {
+  state.bookPanelOpen = !state.bookPanelOpen;
+  renderMain();
+  // focus the search box in the panel after render
+  if (state.bookPanelOpen) {
+    setTimeout(() => {
+      const bs = document.getElementById('bookSearch');
+      if (bs) bs.focus();
+    }, 50);
+  }
+}
+
+function selectBook(book) {
+  state.bookFilter = (state.bookFilter === book) ? null : book;
+  state.bookPanelOpen = false;
+  state.bookSearch = '';
+  renderMain();
+}
+
+function clearBookFilter() {
+  state.bookFilter = null;
+  state.bookPanelOpen = false;
+  state.bookSearch = '';
+  renderMain();
+}
+
+function onBookSearch(val) {
+  state.bookSearch = val;
+  const listEl = document.getElementById('bookListContainer');
+  if (!listEl) return;
+  const sheet = DATA.sheets[state.activeSheet];
+  if (!sheet) return;
+  // Re-filter rows same as renderMain would, to get accurate book counts
+  let rows = sheet.rows;
+  if (state.larpOnly && sheet.hasLarp) {
+    rows = rows.filter(r => { const v = r['Larp Version']; return v && String(v).trim().toUpperCase()==='Y'; });
+  }
+  const q = state.search.trim().toLowerCase();
+  if (q) rows = rows.filter(r => Object.values(r).some(v => v && String(v).toLowerCase().includes(q)));
+  listEl.innerHTML = renderBookList(getBooksForSheet(rows));
+}
+
+function renderBookPanel(allBooks) {
+  return `
+    <div class="book-filter-panel">
+      <div class="book-filter-header">
+        <span class="book-filter-label">Filter by Book</span>
+        <input id="bookSearch" class="book-filter-search" type="search"
+          placeholder="Search books…" autocomplete="off"
+          value="${escH(state.bookSearch)}"
+          oninput="onBookSearch(this.value)"
+          onclick="event.stopPropagation()">
+        <button class="book-filter-clear" onclick="toggleBookPanel()" title="Close">✕</button>
+      </div>
+      <div class="book-list" id="bookListContainer">
+        ${renderBookList(allBooks)}
+      </div>
+    </div>`;
+}
+
+function renderBookList(allBooks) {
+  const bq = state.bookSearch.trim().toLowerCase();
+  const filtered = bq ? allBooks.filter(([b]) => b.toLowerCase().includes(bq)) : allBooks;
+  if (!filtered.length) return `<div class="book-filter-none">No books match "${escH(state.bookSearch)}"</div>`;
+  return filtered.map(([book, count]) => {
+    const active = state.bookFilter === book;
+    return `<button class="book-item ${active?'active':''}" onclick="selectBook(${JSON.stringify(book)})">
+      <span class="book-item-name">${hl(book, bq)}</span>
+      <span class="book-item-count">${count}</span>
+    </button>`;
+  }).join('');
 }
 
 // ── RENDER ──
@@ -661,7 +887,28 @@ function renderMain() {
   }
   if (q) rows = rows.filter(r => Object.values(r).some(v => v && String(v).toLowerCase().includes(q)));
 
+  // Build book list from pre-filter rows (before applying book filter, so all books always show)
+  const allBooks = getBooksForSheet(rows);
+  const hasBookCol = sheet.columns.includes('Book');
+
+  // Apply book filter
+  if (state.bookFilter && hasBookCol) {
+    rows = rows.filter(r => String(r['Book']||'').trim() === state.bookFilter);
+  }
+
   const cols = sheet.columns;
+
+  // Book filter button label
+  let bookBtnHtml = '';
+  if (hasBookCol) {
+    if (state.bookFilter) {
+      bookBtnHtml = `<button class="active-book-badge" onclick="toggleBookPanel()" title="Change book filter">
+        📖 ${escH(state.bookFilter)}<span class="badge-x" onclick="event.stopPropagation();clearBookFilter()">✕</span>
+      </button>`;
+    } else {
+      bookBtnHtml = `<button class="toggle-btn ${state.bookPanelOpen?'active':''}" onclick="toggleBookPanel()">📖 By Book</button>`;
+    }
+  }
 
   let html = `
     <div class="search-bar">
@@ -674,19 +921,21 @@ function renderMain() {
       <div class="filter-row">
         <span class="filter-label">Filter:</span>
         ${sheet.hasLarp ? `<button class="toggle-btn ${state.larpOnly?'active':''}" onclick="toggleLarp()">✦ LARP Only</button>` : ''}
-        <button class="toggle-btn" onclick="state.activeSheet=null;buildSidebar();renderMain()">← All</button>
+        ${bookBtnHtml}
+        <button class="toggle-btn" onclick="state.activeSheet=null;state.bookFilter=null;state.bookPanelOpen=false;buildSidebar();renderMain()">← All</button>
       </div>
+      ${state.bookPanelOpen && hasBookCol ? renderBookPanel(allBooks) : ''}
     </div>
     <div class="content-header">
       <div>
         <div class="content-title">${escH(state.activeSheet)}</div>
-        <div class="content-subtitle">${escH(state.activeGameline)}</div>
+        <div class="content-subtitle">${escH(state.activeGameline)}${state.bookFilter ? ` · ${escH(state.bookFilter)}` : ''}</div>
       </div>
       <div class="result-count">${rows.length.toLocaleString()} entries</div>
     </div>`;
 
   if (rows.length === 0) {
-    html += `<div class="empty-state"><div class="empty-icon">⊘</div><h3>No Results Found</h3><p>Try adjusting your search.</p></div>`;
+    html += `<div class="empty-state"><div class="empty-icon">⊘</div><h3>No Results Found</h3><p>Try adjusting your search or filters.</p></div>`;
   } else if (isMobile()) {
     html += renderCards(rows, cols, q);
   } else {
