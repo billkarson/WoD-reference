@@ -442,6 +442,7 @@
   .stat-label { font-size: 11px; color: var(--text-dim); margin-top: 4px; letter-spacing: 0.05em; text-transform: uppercase; }
 
   mark { background: rgba(201,151,58,0.25); color: var(--gold-light); border-radius: 2px; padding: 0 1px; }
+
   /* ── OWBN LEVELS ── */
   .levels-block { margin-top: 10px; display: flex; flex-direction: column; gap: 10px; }
   .level-entry { border-left: 2px solid var(--border-glow); padding: 3px 0 3px 10px; }
@@ -504,7 +505,7 @@
       transform: translateX(0);
     }
 
-    /* drawerOverlay.open defined above */
+    /* drawerOverlay.open handled above */
 
     main { padding: 12px; gap: 12px; }
 
@@ -547,7 +548,18 @@
 
 <div class="app">
   <aside id="sidebar"></aside>
-  <main id="main"></main>
+  <main id="main">
+    <div class="search-bar" id="searchBar">
+      <div class="search-wrap">
+        <span class="search-icon">⌕</span>
+        <input id="searchInput" type="search" inputmode="search"
+               autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+               placeholder="Search all gamelines…" oninput="onSearch(this.value)">
+      </div>
+      <div class="filter-row" id="filterRow"></div>
+    </div>
+    <div id="mainResults"></div>
+  </main>
 </div>
 
 <script>
@@ -557,10 +569,10 @@ let isMobile = () => window.innerWidth <= 700;
 
 let state = {
   activeGameline: null,
-  activeSheet: null,
-  search: '',
-  larpOnly: false,
-  openGamelines: new Set(),
+  activeSheet:    null,
+  search:         '',
+  larpOnly:       false,
+  openGamelines:  new Set(),
 };
 
 const GAMELINE_COLORS = {
@@ -571,9 +583,8 @@ const GAMELINE_COLORS = {
 };
 
 // ── DRAWER ──────────────────────────────────────────────────────────────────
-// The overlay sits behind the sidebar (z-index 90 vs 95) but iOS still fires
-// touchend on it before the button click. Fix: give overlay pointer-events:none
-// in CSS, and close via a document listener that guards on sidebar.contains().
+// Overlay has pointer-events:none so it cannot steal taps from sidebar buttons.
+// We close by listening for any tap outside the sidebar after a 50ms delay.
 function toggleDrawer() {
   const sidebar = document.getElementById('sidebar');
   const overlay = document.getElementById('drawerOverlay');
@@ -581,7 +592,6 @@ function toggleDrawer() {
   sidebar.classList.toggle('open', opening);
   overlay.classList.toggle('open', opening);
   if (opening) {
-    // 50ms delay so this tap doesn't immediately close the drawer
     setTimeout(function() {
       document.addEventListener('touchstart', _drawerClose, {capture:true, once:true, passive:true});
       document.addEventListener('click',      _drawerClose, {capture:true, once:true});
@@ -593,7 +603,6 @@ function _drawerClose(e) {
   if (!document.getElementById('sidebar').contains(e.target)) {
     closeDrawer();
   } else if (document.getElementById('sidebar').classList.contains('open')) {
-    // re-arm so the next outside tap still closes
     setTimeout(function() {
       document.addEventListener('touchstart', _drawerClose, {capture:true, once:true, passive:true});
       document.addEventListener('click',      _drawerClose, {capture:true, once:true});
@@ -606,7 +615,7 @@ function closeDrawer() {
   document.getElementById('drawerOverlay').classList.remove('open');
 }
 
-// ── LOAD ────────────────────────────────────────────────────────────────────
+// ── LOAD ─────────────────────────────────────────────────────────────────────
 async function loadData() {
   try {
     const res = await fetch('data.json');
@@ -617,13 +626,13 @@ async function loadData() {
   } catch(e) {
     document.getElementById('loading').innerHTML =
       '<div class="load-title" style="color:#c0392b">Failed to load data.json</div>' +
-      '<p style="color:var(--text-dim);font-size:14px;margin-top:12px;padding:0 24px;text-align:center">Make sure data.json is in the same folder as index.html</p>';
+      '<p style="color:var(--text-dim);font-size:14px;margin-top:12px;padding:0 24px;text-align:center">' +
+      'Make sure data.json is in the same folder as index.html</p>';
   }
 }
 
-// ── SIDEBAR ─────────────────────────────────────────────────────────────────
-// Use data-attributes + event delegation so gameline names with quotes/apostrophes
-// never break onclick strings.
+// ── SIDEBAR ──────────────────────────────────────────────────────────────────
+// Uses data-attributes so gameline/sheet names with any characters work safely.
 function buildSidebar() {
   const sidebar = document.getElementById('sidebar');
   let html = '';
@@ -639,7 +648,7 @@ function buildSidebar() {
         '<span class="gameline-dot" style="background:' + color + '"></span>' +
         escH(gl) +
         '<span class="gameline-count">' + total.toLocaleString() + '</span>' +
-        '<span class="chevron ' + (isOpen?'open':'') + '">›</span>' +
+        '<span class="chevron ' + (isOpen?'open':'') + '">\u203a</span>' +
       '</button>' +
       '<div class="sheet-list ' + (isOpen?'open':'') + '">';
 
@@ -648,15 +657,14 @@ function buildSidebar() {
         'data-sheet="' + escAttr(name) + '" data-gl="' + escAttr(gl) + '">' +
         escH(name) +
         '<span class="sheet-row-count">' + sheet.rows.length.toLocaleString() + '</span>' +
-      '</button>';
+        '</button>';
     }
     html += '</div></div>';
   }
   sidebar.innerHTML = html;
 }
 
-// Single delegated listener on the sidebar — works perfectly on mobile because
-// there is no overlay interference at all.
+// Single delegated listener — handles all sidebar clicks safely.
 document.addEventListener('click', function(e) {
   const glBtn    = e.target.closest('.gameline-btn');
   const sheetBtn = e.target.closest('.sheet-btn');
@@ -678,96 +686,64 @@ function selectSheet(name, gl) {
   state.activeGameline = gl;
   state.search         = '';
   state.openGamelines.add(gl);
-  // Clear the search input value without rebuilding it
-  var inp = document.getElementById('searchInput');
-  if (inp) inp.value = '';
+  const inp = document.getElementById('searchInput');
+  if (inp) { inp.value = ''; inp.placeholder = 'Search ' + name + '\u2026'; }
   buildSidebar();
   renderMain();
-  var lbl = document.getElementById('activeSheetLabel');
+  const lbl = document.getElementById('activeSheetLabel');
   if (lbl) lbl.textContent = name;
   if (isMobile()) closeDrawer();
 }
 
-// ── RENDER ───────────────────────────────────────────────────────────────────
-// KEY FIX for search: the search input is inside a container div (#searchSticky)
-// that we NEVER replace with innerHTML. We only replace #mainResults.
-// This means iOS never destroys and recreates the <input>, so the keyboard stays.
+// ── RENDER ────────────────────────────────────────────────────────────────────
+// The search input (#searchInput) lives permanently in #searchBar in the HTML.
+// It is NEVER recreated — only #filterRow and #mainResults change on each render.
+// This means iOS never dismisses the keyboard while typing.
 
 function renderMain() {
-  var q       = state.search.trim().toLowerCase();
-  var sticky  = document.getElementById('searchSticky');
-  var results = document.getElementById('mainResults');
-
-  if (!sticky || !results) {
-    // First render — need to build the scaffold
-    var main = document.getElementById('main');
-    main.innerHTML =
-      '<div id="searchSticky"></div>' +
-      '<div id="mainResults"></div>';
-    sticky  = document.getElementById('searchSticky');
-    results = document.getElementById('mainResults');
-  }
+  const q         = state.search.trim().toLowerCase();
+  const filterRow = document.getElementById('filterRow');
+  const results   = document.getElementById('mainResults');
+  const inp       = document.getElementById('searchInput');
 
   if (!state.activeSheet) {
-    // No sheet selected: hide the sheet-specific search bar, show welcome/global
-    sticky.innerHTML = '';
-    if (q.length >= 2) {
-      results.innerHTML = buildGlobalSearchHTML(q);
-    } else {
-      results.innerHTML = buildWelcomeHTML();
-    }
+    // No sheet: reset placeholder, clear filter row, show welcome or global search
+    if (inp) inp.placeholder = 'Search all gamelines\u2026';
+    filterRow.innerHTML = '';
+    results.innerHTML   = q.length >= 2 ? buildGlobalSearch(q) : buildWelcome();
     return;
   }
 
-  // Sheet is active: show persistent search bar (only rebuild if sheet changed)
-  var sheet = DATA.sheets[state.activeSheet];
+  // Sheet active: update placeholder and filter row
+  const sheet = DATA.sheets[state.activeSheet];
   if (!sheet) return;
 
-  // Only rebuild the sticky bar if the sheet changed (avoids destroying the input)
-  if (sticky.dataset.sheet !== state.activeSheet) {
-    sticky.dataset.sheet = state.activeSheet;
-    sticky.innerHTML =
-      '<div class="search-bar">' +
-        '<div class="search-wrap">' +
-          '<span class="search-icon">⌕</span>' +
-          '<input id="searchInput" type="search" inputmode="search" ' +
-            'autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" ' +
-            'placeholder="Search ' + escAttr(state.activeSheet) + '…" ' +
-            'oninput="onSearch(this.value)">' +
-        '</div>' +
-        '<div id="filterRow" class="filter-row"></div>' +
-      '</div>';
-  }
-
-  // Always update the filter row (larpOnly state may have changed)
-  var filterRow = document.getElementById('filterRow');
-  if (filterRow) {
-    filterRow.innerHTML =
-      '<span class="filter-label">Filter:</span>' +
-      (sheet.hasLarp ? '<button class="toggle-btn ' + (state.larpOnly?'active':'') + '" onclick="toggleLarp()">✦ LARP Only</button>' : '') +
-      '<button class="toggle-btn" onclick="goBack()">← All</button>';
-  }
+  filterRow.innerHTML =
+    '<span class="filter-label">Filter:</span>' +
+    (sheet.hasLarp
+      ? '<button class="toggle-btn ' + (state.larpOnly?'active':'') + '" onclick="toggleLarp()">\u2726 LARP Only</button>'
+      : '') +
+    '<button class="toggle-btn" onclick="goBack()">\u2190 All</button>';
 
   // Filter rows
-  var rows = sheet.rows;
-  if (state.larpOnly && sheet.hasLarp) {
-    rows = rows.filter(function(r) { var v = r['Larp Version']; return v && String(v).trim().toUpperCase()==='Y'; });
-  }
-  if (q) {
-    rows = rows.filter(function(r) { return Object.values(r).some(function(v) { return v && String(v).toLowerCase().includes(q); }); });
-  }
+  let rows = sheet.rows;
+  if (state.larpOnly && sheet.hasLarp)
+    rows = rows.filter(r => { const v = r['Larp Version']; return v && String(v).trim().toUpperCase() === 'Y'; });
+  if (q)
+    rows = rows.filter(r => Object.values(r).some(v => v && String(v).toLowerCase().includes(q)));
 
-  var cols = sheet.columns;
-  var html = '<div class="content-header">' +
-    '<div>' +
-      '<div class="content-title">' + escH(state.activeSheet) + '</div>' +
-      '<div class="content-subtitle">' + escH(state.activeGameline) + '</div>' +
-    '</div>' +
-    '<div class="result-count">' + rows.length.toLocaleString() + ' entries</div>' +
-  '</div>';
+  const cols = sheet.columns;
+  let html =
+    '<div class="content-header">' +
+      '<div>' +
+        '<div class="content-title">' + escH(state.activeSheet) + '</div>' +
+        '<div class="content-subtitle">' + escH(state.activeGameline) + '</div>' +
+      '</div>' +
+      '<div class="result-count">' + rows.length.toLocaleString() + ' entries</div>' +
+    '</div>';
 
   if (rows.length === 0) {
-    html += '<div class="empty-state"><div class="empty-icon">⊘</div><h3>No Results Found</h3><p>Try adjusting your search.</p></div>';
+    html += '<div class="empty-state"><div class="empty-icon">\u2298</div><h3>No Results Found</h3><p>Try adjusting your search.</p></div>';
   } else if (isMobile()) {
     html += renderCards(rows, cols, q);
   } else {
@@ -780,17 +756,19 @@ function renderMain() {
 function goBack() {
   state.activeSheet = null;
   state.search      = '';
+  const inp = document.getElementById('searchInput');
+  if (inp) { inp.value = ''; inp.placeholder = 'Search all gamelines\u2026'; }
   buildSidebar();
   renderMain();
 }
 
-function buildWelcomeHTML() {
-  var totalRows   = Object.values(DATA.sheets).reduce(function(a,s){ return a+s.rows.length; }, 0);
-  var totalSheets = Object.keys(DATA.sheets).length;
+function buildWelcome() {
+  const totalRows   = Object.values(DATA.sheets).reduce((a,s) => a + s.rows.length, 0);
+  const totalSheets = Object.keys(DATA.sheets).length;
   return '<div class="welcome">' +
-    '<div class="welcome-symbol">✦</div>' +
-    '<h2>Old World of Darkness — MET Index</h2>' +
-    '<p>' + (isMobile() ? 'Tap ☰ to browse by gameline, or search above.' : 'Select a gameline from the sidebar, or search above.') + '</p>' +
+    '<div class="welcome-symbol">\u2726</div>' +
+    '<h2>Old World of Darkness \u2014 MET Index</h2>' +
+    '<p>' + (isMobile() ? 'Tap \u2630 to browse by gameline, or search above.' : 'Select a gameline from the sidebar, or search above.') + '</p>' +
     '<div class="welcome-stats">' +
       '<div class="stat-box"><span class="stat-num">' + totalRows.toLocaleString() + '</span><div class="stat-label">Entries</div></div>' +
       '<div class="stat-box"><span class="stat-num">' + totalSheets + '</span><div class="stat-label">Categories</div></div>' +
@@ -800,39 +778,39 @@ function buildWelcomeHTML() {
   '</div>';
 }
 
-function buildGlobalSearchHTML(q) {
-  var results = [];
-  for (var entry of Object.entries(DATA.sheets)) {
-    var name  = entry[0];
-    var sheet = entry[1];
-    var rows  = sheet.rows.filter(function(r){ return Object.values(r).some(function(v){ return v && String(v).toLowerCase().includes(q); }); });
+function buildGlobalSearch(q) {
+  const results = [];
+  for (const [name, sheet] of Object.entries(DATA.sheets)) {
+    let rows = sheet.rows.filter(r => Object.values(r).some(v => v && String(v).toLowerCase().includes(q)));
     if (state.larpOnly && sheet.hasLarp)
-      rows = rows.filter(function(r){ var v=r['Larp Version']; return v && String(v).trim().toUpperCase()==='Y'; });
-    if (rows.length) results.push({name:name, sheet:sheet, rows:rows});
+      rows = rows.filter(r => { const v = r['Larp Version']; return v && String(v).trim().toUpperCase() === 'Y'; });
+    if (rows.length) results.push({name, sheet, rows});
   }
-  var totalHits = results.reduce(function(a,r){ return a+r.rows.length; }, 0);
+  const totalHits = results.reduce((a,r) => a + r.rows.length, 0);
 
-  var html = '<div class="content-header">' +
-    '<div class="content-title">Search: "' + escH(state.search) + '"</div>' +
-    '<div class="result-count">' + totalHits.toLocaleString() + ' in ' + results.length + ' categories</div>' +
-  '</div>';
+  let html =
+    '<div class="content-header">' +
+      '<div class="content-title">Search: "' + escH(state.search) + '"</div>' +
+      '<div class="result-count">' + totalHits.toLocaleString() + ' in ' + results.length + ' categories</div>' +
+    '</div>';
 
   if (!results.length) {
-    html += '<div class="empty-state"><div class="empty-icon">⊘</div><h3>No Results Found</h3></div>';
+    html += '<div class="empty-state"><div class="empty-icon">\u2298</div><h3>No Results Found</h3></div>';
   } else {
-    for (var r of results) {
-      var gl   = r.sheet.gameline;
-      var cols = r.sheet.columns;
-      html += '<div class="global-result-group">' +
-        '<div class="global-group-header" ' +
-          'data-sheet="' + escAttr(r.name) + '" data-gl="' + escAttr(gl) + '" ' +
-          'onclick="selectSheet(this.dataset.sheet,this.dataset.gl)">' +
-          '<span class="gameline-dot" style="background:' + (GAMELINE_COLORS[gl]||'#888') + ';width:8px;height:8px;border-radius:50%;display:inline-block"></span>' +
-          '<h3>' + escH(r.name) + '</h3>' +
-          '<span class="gameline-tag">' + escH(gl) + '</span>' +
-          '<span class="global-group-count">' + r.rows.length + ' match' + (r.rows.length!==1?'es':'') + '</span>' +
-        '</div>';
-      var shown = r.rows.slice(0,50);
+    for (const {name, sheet, rows} of results) {
+      const gl   = sheet.gameline;
+      const cols = sheet.columns;
+      html +=
+        '<div class="global-result-group">' +
+          '<div class="global-group-header" ' +
+              'data-sheet="' + escAttr(name) + '" data-gl="' + escAttr(gl) + '" ' +
+              'onclick="selectSheet(this.dataset.sheet, this.dataset.gl)">' +
+            '<span class="gameline-dot" style="background:' + (GAMELINE_COLORS[gl]||'#888') + ';width:8px;height:8px;border-radius:50%;display:inline-block"></span>' +
+            '<h3>' + escH(name) + '</h3>' +
+            '<span class="gameline-tag">' + escH(gl) + '</span>' +
+            '<span class="global-group-count">' + rows.length + ' match' + (rows.length!==1?'es':'') + '</span>' +
+          '</div>';
+      const shown = rows.slice(0, 50);
       html += isMobile() ? renderCards(shown, cols, q) : renderTable(shown, cols, q, 240);
       html += '</div>';
     }
@@ -840,17 +818,17 @@ function buildGlobalSearchHTML(q) {
   return html;
 }
 
-// ── OWBN LEVELS RENDERER ─────────────────────────────────────────────────────
-var DOTS = ['','•','••','•••','••••','•••••'];
+// ── OWBN LEVELS ──────────────────────────────────────────────────────────────
+const DOTS = ['','\u2022','\u2022\u2022','\u2022\u2022\u2022','\u2022\u2022\u2022\u2022','\u2022\u2022\u2022\u2022\u2022'];
 
 function renderLevels(levelsJson) {
   if (!levelsJson) return '';
-  var levels;
+  let levels;
   try { levels = JSON.parse(levelsJson); } catch(e) { return ''; }
   if (!levels || !levels.length) return '';
-  var h = '<div class="levels-block">';
-  for (var lv of levels) {
-    var dot = (lv.Level >= 1 && lv.Level <= 5) ? DOTS[lv.Level] : String(lv.Level);
+  let h = '<div class="levels-block">';
+  for (const lv of levels) {
+    const dot = (lv.Level >= 1 && lv.Level <= 5) ? DOTS[lv.Level] : String(lv.Level);
     h += '<div class="level-entry">' +
       '<div class="level-header">' +
         '<span class="level-dot">' + escH(dot) + '</span>' +
@@ -864,31 +842,31 @@ function renderLevels(levelsJson) {
 
 // ── TABLE (desktop) ───────────────────────────────────────────────────────────
 function renderTable(rows, cols, q, maxH) {
-  var hasLevels = cols.includes('Levels');
-  var dcols = (maxH ? cols.slice(0,5) : cols).filter(function(c){ return c !== 'Levels'; });
-  var style = maxH ? 'style="max-height:' + maxH + 'px"' : '';
-  var h = '<div class="table-wrap" ' + style + '><table><thead><tr>';
-  for (var c of dcols) h += '<th>' + escH(c) + '</th>';
+  const hasLevels = cols.includes('Levels');
+  const dcols = (maxH ? cols.slice(0,5) : cols).filter(c => c !== 'Levels');
+  const style = maxH ? 'style="max-height:' + maxH + 'px"' : '';
+  let h = '<div class="table-wrap" ' + style + '><table><thead><tr>';
+  for (const c of dcols) h += '<th>' + escH(c) + '</th>';
   h += '</tr></thead><tbody>';
-  for (var row of rows) {
+  for (const row of rows) {
     h += '<tr>';
-    for (var i=0; i<dcols.length; i++) {
-      var col = dcols[i]; var val = row[col]; var d = val==null?'':String(val);
-      if (col==='Larp Version') {
-        h += '<td>' + (d.trim().toUpperCase()==='Y' ? '<span class="larp-badge">LARP</span>' : '') + '</td>';
-      } else if (i===0) {
-        h += '<td class="primary-col">' + hl(d,q) + '</td>';
-      } else if (col==='Page'||col==='Page Number'||col==='Page.1') {
+    for (let i = 0; i < dcols.length; i++) {
+      const col = dcols[i], val = row[col], d = val == null ? '' : String(val);
+      if (col === 'Larp Version') {
+        h += '<td>' + (d.trim().toUpperCase() === 'Y' ? '<span class="larp-badge">LARP</span>' : '') + '</td>';
+      } else if (i === 0) {
+        h += '<td class="primary-col">' + hl(d, q) + '</td>';
+      } else if (col === 'Page' || col === 'Page Number' || col === 'Page.1') {
         h += '<td class="page-col">' + escH(d) + '</td>';
-      } else if (col==='Book') {
-        h += '<td class="book-col">' + hl(d,q) + '</td>';
+      } else if (col === 'Book') {
+        h += '<td class="book-col">' + hl(d, q) + '</td>';
       } else {
-        h += '<td>' + hl(d,q) + '</td>';
+        h += '<td>' + hl(d, q) + '</td>';
       }
     }
     h += '</tr>';
     if (hasLevels && row['Levels']) {
-      var lh = renderLevels(row['Levels']);
+      const lh = renderLevels(row['Levels']);
       if (lh) h += '<tr class="levels-row"><td colspan="' + dcols.length + '" style="padding:4px 12px 14px 24px;border-bottom:1px solid var(--border)">' + lh + '</td></tr>';
     }
   }
@@ -897,39 +875,41 @@ function renderTable(rows, cols, q, maxH) {
 
 // ── CARDS (mobile) ────────────────────────────────────────────────────────────
 function renderCards(rows, cols, q) {
-  var nameCol   = cols[0];
-  var bookCol   = cols.find(function(c){ return c==='Book'; });
-  var pageCol   = cols.find(function(c){ return c==='Page'||c==='Page Number'||c==='Page.1'; });
-  var larpCol   = cols.find(function(c){ return c==='Larp Version'; });
-  var levelsCol = cols.find(function(c){ return c==='Levels'; });
-  var descCol   = cols.find(function(c){ return c==='Description'; });
-  var extraCols = cols.filter(function(c){ return c!==nameCol&&c!==bookCol&&c!==pageCol&&c!==larpCol&&c!=='Page.1'&&c!=='Levels'&&c!=='Description'; });
+  const nameCol   = cols[0];
+  const bookCol   = cols.find(c => c === 'Book');
+  const pageCol   = cols.find(c => c === 'Page' || c === 'Page Number' || c === 'Page.1');
+  const larpCol   = cols.find(c => c === 'Larp Version');
+  const levelsCol = cols.find(c => c === 'Levels');
+  const descCol   = cols.find(c => c === 'Description');
+  const extraCols = cols.filter(c =>
+    c !== nameCol && c !== bookCol && c !== pageCol &&
+    c !== larpCol && c !== 'Page.1' && c !== 'Levels' && c !== 'Description');
 
-  var h = '<div class="card-list">';
-  for (var row of rows) {
-    var name   = row[nameCol]==null?'':String(row[nameCol]);
-    var book   = bookCol  && row[bookCol]  ? String(row[bookCol])  : '';
-    var page   = pageCol  && row[pageCol]  ? String(row[pageCol])  : '';
-    var isLarp = larpCol  && String(row[larpCol]||'').trim().toUpperCase()==='Y';
+  let h = '<div class="card-list">';
+  for (const row of rows) {
+    const name   = row[nameCol] == null ? '' : String(row[nameCol]);
+    const book   = bookCol && row[bookCol]  ? String(row[bookCol])  : '';
+    const page   = pageCol && row[pageCol]  ? String(row[pageCol])  : '';
+    const isLarp = larpCol && String(row[larpCol] || '').trim().toUpperCase() === 'Y';
 
     h += '<div class="entry-card">';
-    h += '<div class="entry-card-name">' + hl(name,q) + (isLarp?' <span class="larp-badge">LARP</span>':'') + '</div>';
+    h += '<div class="entry-card-name">' + hl(name, q) + (isLarp ? ' <span class="larp-badge">LARP</span>' : '') + '</div>';
 
     if (book || page) {
       h += '<div class="entry-card-meta">';
-      if (book) h += '<span class="entry-card-book">' + hl(book,q) + '</span>';
+      if (book) h += '<span class="entry-card-book">' + hl(book, q) + '</span>';
       if (page) h += '<span class="entry-card-page">p.' + escH(page) + '</span>';
       h += '</div>';
     }
 
-    if (descCol && row[descCol]) {
+    if (descCol && row[descCol])
       h += '<div class="level-desc" style="margin-top:5px;font-size:13px">' + escH(String(row[descCol])) + '</div>';
-    }
 
-    var extras = extraCols.filter(function(c){ return row[c]!=null && String(row[c]).trim()!==''; });
+    const extras = extraCols.filter(c => row[c] != null && String(row[c]).trim() !== '');
     if (extras.length) {
       h += '<div class="entry-card-extras">';
-      for (var c of extras.slice(0,4)) h += '<span class="entry-tag">' + escH(c) + ': ' + hl(String(row[c]),q) + '</span>';
+      for (const c of extras.slice(0, 4))
+        h += '<span class="entry-tag">' + escH(c) + ': ' + hl(String(row[c]), q) + '</span>';
       h += '</div>';
     }
 
@@ -942,23 +922,23 @@ function renderCards(rows, cols, q) {
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function hl(text, q) {
-  if (!q||!text) return escH(text);
-  var safe  = escH(text);
-  var safeQ = escH(q).replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
-  return safe.replace(new RegExp('(' + safeQ + ')','gi'),'<mark>$1</mark>');
+  if (!q || !text) return escH(text);
+  const safe  = escH(text);
+  const safeQ = escH(q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return safe.replace(new RegExp('(' + safeQ + ')', 'gi'), '<mark>$1</mark>');
 }
 
 function escH(str) {
-  if (str==null) return '';
+  if (str == null) return '';
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 function escAttr(str) {
-  if (str==null) return '';
+  if (str == null) return '';
   return String(str).replace(/&/g,'&amp;').replace(/"/g,'&quot;');
 }
 
-var _searchTimer;
+let _searchTimer;
 function onSearch(val) {
   state.search = val;
   clearTimeout(_searchTimer);
